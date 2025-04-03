@@ -24,6 +24,7 @@ int todo(char* msg)
 
 int parse_options(int key, char *arg, struct argp_state *state)
 {
+	UNUSED(arg);
 	switch (key)
 	{
 	case 'v':
@@ -61,6 +62,6 @@ int main(int argc, char **argv) {
 	// check if verbose is set
 
 
-	ft_nmap();
+	// ft_nmap();
 	return 0;
 }

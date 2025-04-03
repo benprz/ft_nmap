@@ -1,3 +1,4 @@
 .obj
 ft_nmap
 .vscode
+.clangd
