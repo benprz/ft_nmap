@@ -1,13 +1,5 @@
-#define _GNU_SOURCE
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <stdbool.h>
-#include <signal.h>
-#include <error.h>
-#include <math.h>
+#ifndef FT_NMAP_H
+#define FT_NMAP_H
 
 #define UNUSED(x) (void)x
 
@@ -25,3 +17,5 @@ void print_stats();
 
 void ft_nmap();
 int todo(char*);
+
+#endif

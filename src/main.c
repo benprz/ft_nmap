@@ -1,3 +1,5 @@
+#include <error.h>
+#include <netdb.h>
 #include <stdio.h>
 #include <argp.h>
 #include <unistd.h>
@@ -16,10 +18,20 @@ struct s_nmap g_nmap = {
 
 int todo(char* msg)
 {
-    printf("# TODO MESSAGE: ");
-    puts(msg);
-    putc('\n', stdout);
+    printf("# TODO MESSAGE: %s\n", msg);
     return -1;
+}
+
+int parse_host(char *hostname)
+{
+	struct addrinfo *hostinfo;
+
+	//must free with api function
+	if (getaddrinfo(hostname, NULL, NULL, &hostinfo) < 0) {
+		return todo("getaddrinfo error");
+	}
+
+	return 0;
 }
 
 int parse_options(int key, char *arg, struct argp_state *state)
@@ -44,12 +56,13 @@ int parse_options(int key, char *arg, struct argp_state *state)
 	return 0;
 }
 
-int main(int argc, char **argv) {
-    if (getuid() != 0)
-	{
-	    fprintf(stderr, "You must be root to use ft_nmap\n");
-	    return (1);
-	}
+int main(int argc, char **argv)
+{
+ //    if (getuid() != 0)
+	// {
+	//     fprintf(stderr, "You must be root to use ft_nmap\n");
+	//     return (1);
+	// }
 
 	// argp
 	struct argp_option options[] = {
