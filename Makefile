@@ -9,7 +9,8 @@ INC = ft_nmap.h
 EXE = ft_nmap
 
 SRC_DIR = src/
-SRC =	main.c
+SRC =	main.c \
+		ft_nmap.c
 
 OBJ_DIR = .obj/
 OBJ = $(SRC:%.c=$(OBJ_DIR)%.o)
@@ -42,6 +43,6 @@ clean:
 fclean: clean
 	@/bin/rm -f $(EXE)
 
-re: 
+re:
 	$(MAKE) fclean
 	$(MAKE) all

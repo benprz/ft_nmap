@@ -4,6 +4,7 @@
 #define UNUSED(x) (void)x
 
 #define OPT_VERBOSE 0x1
+#define OPT_SCAN_SYN 0x2
 
 struct s_nmap
 {
@@ -12,10 +13,8 @@ struct s_nmap
 
 extern struct s_nmap g_nmap;
 
-void signal_handler(int);
-void print_stats();
-
-void ft_nmap();
 int todo(char*);
+
+int ft_nmap();
 
 #endif
