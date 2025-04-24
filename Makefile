@@ -10,14 +10,15 @@ EXE = ft_nmap
 
 SRC_DIR = src/
 SRC =	main.c \
-		ft_nmap.c
+		ft_nmap.c \
+		utils.c
 
 OBJ_DIR = .obj/
 OBJ = $(SRC:%.c=$(OBJ_DIR)%.o)
 
 .PHONY : all clean fclean re $(EXE)
 
-all: $(EXE)
+all: $(EXE) run
 
 $(EXE): $(OBJ)
 	$(CC) $(CFLAGS) $(OBJ) -o $(EXE) -lm
@@ -26,6 +27,12 @@ $(EXE): $(OBJ)
 $(OBJ_DIR)%.o: $(SRC_DIR)%.c $(addprefix $(INC_DIR),$(INC))
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@ -I $(INC_DIR) -lpcap -lpthread
+
+run:
+	./$(EXE) host
+
+strace: $(EXE)
+	strace ./$(EXE) host
 
 container:
 	docker build . -t ft_nmap

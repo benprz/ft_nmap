@@ -26,12 +26,6 @@ enum {
 #define ARGP_LONG_NAME_SYN "-sS"
 #define ARGP_LONG_NAME_SYN_REPLACE "--sS"
 
-int todo(char* msg)
-{
-    printf("# TODO MESSAGE: %s\n", msg);
-    return -1;
-}
-
 int parse_host(char *hostname)
 {
 	struct addrinfo *hostinfo;
