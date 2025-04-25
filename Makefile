@@ -18,15 +18,15 @@ OBJ = $(SRC:%.c=$(OBJ_DIR)%.o)
 
 .PHONY : all clean fclean re $(EXE)
 
-all: $(EXE) run
+all: $(EXE)
 
 $(EXE): $(OBJ)
-	$(CC) $(CFLAGS) $(OBJ) -o $(EXE) -lm
-	@echo "------------\n"
+	$(CC) $(CFLAGS) $(OBJ) -o $(EXE) -lm -lpcap -lpthread
+	@echo "------------"
 
 $(OBJ_DIR)%.o: $(SRC_DIR)%.c $(addprefix $(INC_DIR),$(INC))
 	@mkdir -p $(OBJ_DIR)
-	$(CC) $(CFLAGS) -c $< -o $@ -I $(INC_DIR) -lpcap -lpthread
+	$(CC) $(CFLAGS) -c $< -o $@ -I $(INC_DIR)
 
 run:
 	./$(EXE) host
