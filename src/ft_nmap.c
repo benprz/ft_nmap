@@ -57,15 +57,40 @@ int ft_nmap() {
 	// return 0;
 	int sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
 	if (sockfd < 0) {
-		perror("socket");
+		perror("ft_nmap -> socket()");
 		return -1;
 	}
+
+	int sockfd_tcp = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (sockfd_tcp < 0) {
+		perror("ft_nmap -> socket()");
+		return -1;
+	}
+
+	printf("Socket file descriptor: %d\n", sockfd);
+	printf("Socket TCP file descriptor: %d\n", sockfd_tcp);
 
 	struct sockaddr_in src_addr, dest_addr = {
 		.sin_family = AF_INET,
 		.sin_port = 0, // doesn't matter here
-		.sin_addr.s_addr = inet_addr("8.8.8.8")
+		.sin_addr.s_addr = inet_addr("127.0.0.1")
 	};
+
+	if (bind(sockfd_tcp, (struct sockaddr*)&dest_addr, sizeof(dest_addr)) < 0) {
+		perror("ft_nmap -> bind()");
+		close(sockfd);
+		return -1;
+	}
+
+	struct sockaddr_in bound_addr;
+	socklen_t bound_addr_len = sizeof(bound_addr);
+	if (getsockname(sockfd_tcp, (struct sockaddr*)&bound_addr, &bound_addr_len) < 0) {
+		perror("ft_nmap -> getsockname()");
+		close(sockfd_tcp);
+		close(sockfd);
+		return -1;
+	}
+	printf("sockfd_tcp is bound to port: %u\n", ntohs(bound_addr.sin_port));
 
 	if (query_routing_table_for_src_addr(&dest_addr, &src_addr) == -1) {
 		return -1;
@@ -83,7 +108,7 @@ int ft_nmap() {
 	};
 
 	struct tcphdr tcp_header = {
-		.source = htons(12345), // Source port
+		.source = bound_addr.sin_port, // Source port
 		.dest = htons(80),   // Destination port
 		.seq = htonl(0),       // Sequence number
 		.ack_seq = 0,          // Acknowledgment number
@@ -98,6 +123,7 @@ int ft_nmap() {
 	memcpy(send_buffer, &tcp_header, sizeof(struct tcphdr));
 	memcpy(send_buffer + sizeof(struct tcphdr), &tcp_options, sizeof(tcp_options));
 
+	printf("send_buffer size : %lu | %% 4 = %lu\n", sizeof(send_buffer), sizeof(send_buffer) % 4);
 
 	struct pseudo_header_for_tcp_checksum pseudo_header;
 
@@ -116,7 +142,7 @@ int ft_nmap() {
 	char recv_buffer[1024] = { 0 };
 	sendto(sockfd, send_buffer, sizeof(send_buffer), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
 	socklen_t dest_addr_len = sizeof(dest_addr);
-	recvfrom(sockfd, recv_buffer, sizeof(recv_buffer), 0, (struct sockaddr*)&dest_addr, &dest_addr_len);
+	recvfrom(sockfd_tcp, recv_buffer, sizeof(recv_buffer), 0, (struct sockaddr*)&dest_addr, &dest_addr_len);
 	printf("buffer: `%s`\n", recv_buffer);
 	close(sockfd);
 	return 0;
