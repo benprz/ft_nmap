@@ -11,6 +11,7 @@ EXE = ft_nmap
 SRC_DIR = src/
 SRC =	main.c \
 		ft_nmap.c \
+		parsing.c \
 		utils.c
 
 OBJ_DIR = .obj/

@@ -1,5 +1,6 @@
 #include <error.h>
 #include <netdb.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <argp.h>
 #include <unistd.h>
@@ -9,18 +10,25 @@
 
 #include "ft_nmap.h"
 
-const char args_doc[] = "[-t TARGET] [-f FILE]";
+const char args_doc[] = "TARGET";
 const char doc[] = "Scan for open ports on one or more machines.";
 
-
-struct s_nmap g_nmap = {
-    0, //options
+struct nmap nmap = {
+	ALL,
+	10,
+	1,
+	1024,
+	NULL,
+	NULL,
+	NULL
 };
+
+struct task	*tasks = NULL;
 
 int parse_host(char *hostname)
 {
-	struct addrinfo *hostinfo;
-	struct addrinfo hints;
+	struct addrinfo	*hostinfo;
+	struct addrinfo	hints;
 	int				ret;
 
 	memset(&hints, 0, sizeof hints);
@@ -33,29 +41,6 @@ int parse_host(char *hostname)
 		return (-1);
 	}
 	// ret = socket()
-	return 0;
-}
-
-
-int parse_options(int key, char *arg, struct argp_state *state)
-{
-	UNUSED(arg);
-	switch (key)
-	{
-		case 'v':
-			g_nmap.options |= OPT_VERBOSE;
-			return todo("OPT_VERBOSE");
-
-		case ARGP_KEY_ARG:
-			return todo("ARGP_KEY_ARG");
-
-		case ARGP_KEY_NO_ARGS:
-			argp_error(state, "missing host operand");
-
-		/* FALLTHROUGH */
-		default:
-			return ARGP_ERR_UNKNOWN;
-	}
 	return 0;
 }
 
@@ -79,7 +64,7 @@ int main(int argc, char **argv)
 
 	struct argp argp = {options, parse_options, args_doc, doc, 0, 0, 0};
 	argp_parse(&argp, argc, argv, 0, 0, 0);
-
+	print_args(nmap);
 	// check if verbose is set
 	return ft_nmap();
 }
