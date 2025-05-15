@@ -107,6 +107,9 @@ int parse_options(int key, char *arg, struct argp_state *state)
 				argp_error(state, "too many arguments");
 			nmap.target_arg = arg;
 			break;
+		case ARGP_KEY_END:
+			if (!nmap.target_file && !nmap.target_opt && !nmap.target_arg)
+				argp_error(state, "no target provided");
 		/* FALLTHROUGH */
 		default:
 			return ARGP_ERR_UNKNOWN;

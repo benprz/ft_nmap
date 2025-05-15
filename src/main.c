@@ -46,13 +46,6 @@ int parse_host(char *hostname)
 
 int main(int argc, char **argv)
 {
-	//if (getuid() != 0)
-	//{
-	//    fprintf(stderr, "You must be root to use ft_nmap\n");
-	//    return (1);
-	//}
-
-	// argp
 	const struct argp_option options[] = {
 		{"target", 't', "TARGET", 0, "target (IP or hostname) to scan", 0},
 		{"file", 'f', "FILE", 0, "file containing a list of targets to scan", 0},
@@ -64,7 +57,13 @@ int main(int argc, char **argv)
 
 	struct argp argp = {options, parse_options, args_doc, doc, 0, 0, 0};
 	argp_parse(&argp, argc, argv, 0, 0, 0);
-	print_args(nmap);
-	// check if verbose is set
-	return ft_nmap();
+	// print_args(nmap);
+	if (getuid() != 0)
+	{
+	    fprintf(stderr, "You must be root to use ft_nmap\n");
+	    return (1);
+	}
+	create_tasks();
+	// print_tasks(tasks);
+	return (0);
 }

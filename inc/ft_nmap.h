@@ -4,10 +4,9 @@
 #include <stdint.h>
 #include <sys/socket.h>
 #include <argp.h>
+#include <netinet/in.h>
 
 #define UNUSED(x) (void)x
-
-#define OPT_VERBOSE 0x1
 
 enum	scan_type
 {
@@ -27,9 +26,9 @@ struct	nmap
 
 struct	task
 {
-	struct sockaddr	target;
-	socklen_t		target_len;
-	enum scan_type	scan;
+	struct sockaddr_in	target;
+	enum scan_type		scan;
+	struct task			*next;
 };
 
 // TCP pseudo-header for checksum computation (IPv4)
@@ -42,9 +41,12 @@ struct pseudo_header_for_tcp_checksum {
 };
 
 extern struct nmap nmap;
+extern struct task *tasks;
 
 int		ft_nmap();
 int		parse_options(int key, char *arg, struct argp_state *state);
+void	create_tasks(void);
+void    print_tasks(struct task *task_list);
 
 // utils functions
 int todo(char*);
