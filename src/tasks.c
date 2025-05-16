@@ -1,5 +1,6 @@
 #include "ft_nmap.h"
 
+#include <stddef.h>
 #include <stdint.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -49,19 +50,33 @@ void	print_tasks(struct task *task_list)
 	}
 }
 
+void	free_task_list(struct task *list)
+{
+	struct task	*next;
+
+	while (list)
+	{
+		next = list->next;
+		free(list);
+		list = next;
+	}
+}
+
+// il faut absolument utiliser cette fonction pour ajouter des task à la liste
 void	append_task_to_list(struct task *new_task)
 {
-	struct task	*last;
+	static struct task	*last = NULL;
 
-	if (!tasks)
+	if (!last)
 	{
 		tasks = new_task;
-		return;
+		last = new_task;
 	}
-	last = tasks;
-	while (last->next)
+	else
+	{
+		last->next = new_task;
 		last = last->next;
-	last->next = new_task;
+	}
 }
 
 void	create_task(struct sockaddr_in addr, enum scan_type scan)
@@ -70,7 +85,7 @@ void	create_task(struct sockaddr_in addr, enum scan_type scan)
 
 	new_task = malloc(sizeof(struct task));
 	if (!new_task)
-		fprintf(stderr, "Error: couldn't create task: %s\n", strerror(errno));
+		fprintf(stderr, "Couldn't create task: %s\n", strerror(errno));
 	else
 	{
 		*new_task = (struct task) {addr, scan, NULL};
@@ -84,12 +99,14 @@ int	get_target_sockaddr(char *target, struct sockaddr_in *addr)
 	struct addrinfo	hints;
 	int				ret;
 
+	if (!strlen(target))
+		return (1);
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET;
 	ret = getaddrinfo(target, NULL, &hints, &info);
 	if (ret || !info)
 	{
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(ret));
+		fprintf(stderr, "%s: %s\n", target, gai_strerror(ret));
 		return (1);
 	}
 	*addr = * (struct sockaddr_in *) info->ai_addr;
@@ -118,9 +135,43 @@ void	target_create_all_tasks(struct sockaddr_in addr)
 void	create_tasks(void)
 {
 	struct sockaddr_in	addr;
+	FILE				*file;
+	char				*next_target;
+	char				*clean_target;
+	size_t				len;
+	ssize_t				ret;
 
+	if (nmap.target_file)
+	{
+		file = fopen(nmap.target_file, "r");
+		if (!file)
+		{
+			fprintf(stderr, "Error: couldn't open file: %s\n", strerror(errno));
+			exit(1);
+		}
+	}
 	if (nmap.target_arg && !get_target_sockaddr(nmap.target_arg, &addr))
 		target_create_all_tasks(addr);
 	if (nmap.target_opt && !get_target_sockaddr(nmap.target_opt, &addr))
 		target_create_all_tasks(addr);
+	if (!nmap.target_file)
+		return;
+	len = 0;
+	next_target = NULL;
+	while ((ret = getline(&next_target, &len, file)) != -1)
+	{
+		clean_target = trim_whitespaces(next_target);
+		if (strlen(clean_target) > 0 && !get_target_sockaddr(clean_target, &addr))
+			target_create_all_tasks(addr);
+	}
+	if (ferror(file))
+	{
+		fprintf(stderr,
+		        "Error: an error occured while trying to read the file: %s\n",
+		        strerror(errno));
+		free_task_list(tasks);
+		exit(2);
+	}
+	free(next_target);
+	fclose(file);
 }

@@ -17,17 +17,17 @@ void	print_args(struct nmap args)
 
 int parse_scan(char *str)
 {
-	if (strcmp(str, "SYN"))
+	if (!strcmp(str, "SYN"))
 		nmap.scan = SYN;
-	else if (strcmp(str, "NULL"))
+	else if (!strcmp(str, "NULL"))
 		nmap.scan = NUL;
-	else if (strcmp(str, "ACK"))
+	else if (!strcmp(str, "ACK"))
 		nmap.scan = ACK;
-	else if (strcmp(str, "FIN"))
+	else if (!strcmp(str, "FIN"))
 		nmap.scan = FIN;
-	else if (strcmp(str, "XMAS"))
+	else if (!strcmp(str, "XMAS"))
 		nmap.scan = XMAS;
-	else if (strcmp(str, "UDP"))
+	else if (!strcmp(str, "UDP"))
 		nmap.scan = UDP;
 	else
 		return (1);

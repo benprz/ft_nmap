@@ -52,6 +52,6 @@ void    print_tasks(struct task *task_list);
 int todo(char*);
 uint16_t calculate_checksum(uint16_t *, int);
 void    print_args(struct nmap args);
-
+char	*trim_whitespaces(char *str);
 
 #endif
