@@ -45,7 +45,6 @@ int parse_host(char *hostname)
 	return 0;
 }
 
-
 int parse_options(int key, char *arg, struct argp_state *state)
 {
 	UNUSED(arg);

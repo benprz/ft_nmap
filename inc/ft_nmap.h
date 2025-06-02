@@ -1,6 +1,10 @@
 #ifndef FT_NMAP_H
 #define FT_NMAP_H
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <stdint.h>
 
 #define UNUSED(x) (void)x
@@ -19,7 +23,7 @@ struct pseudo_header_for_tcp_checksum {
 	uint32_t ip_dst;
 	uint8_t padding;
 	uint8_t protocol;
-	uint8_t tcp_packet_size; // The length of the TCP header and data (measured in octets).
+	uint16_t tcp_length; // The length of the TCP header and data (measured in octets).
 };
 
 extern struct s_nmap g_nmap;
