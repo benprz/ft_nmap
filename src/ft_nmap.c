@@ -57,7 +57,7 @@ int get_src_addr_and_port(const char *dest_ip, struct sockaddr_in *src_addr) {
 }
 
 int send_syn_packet(const char *dest_ip, uint16_t dest_port) {
-    struct sockaddr_in src_addr;
+    struct sockaddr_in src_addr = { 0 };
     if (get_src_addr_and_port(dest_ip, &src_addr) < 0) {
         fprintf(stderr, "Failed to get source address and port\n");
         return -1;
@@ -70,11 +70,11 @@ int send_syn_packet(const char *dest_ip, uint16_t dest_port) {
     }
 
     // Set socket option to include IP header
-    int on = 1;
-    if (setsockopt(raw_socket, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on)) < 0) {
-        perror("Setsockopt error");
-        return -1;
-    }
+    // int on = 1;
+    // if (setsockopt(raw_socket, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on)) < 0) {
+    //     perror("Setsockopt error");
+    //     return -1;
+    // }
 
     char packet[1024];
     memset(packet, 0, sizeof(packet));
@@ -146,8 +146,8 @@ int send_syn_packet(const char *dest_ip, uint16_t dest_port) {
 }
 
 int ft_nmap() {
-	char* dest_ip = "127.0.0.1";
-	uint16_t dest_port = 9999;
+	char* dest_ip = "104.22.45.83";
+	uint16_t dest_port = 80;
 	return send_syn_packet(dest_ip, dest_port);
 }
 
