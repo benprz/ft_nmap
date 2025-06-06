@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <stdlib.h>
 
 #include "ft_nmap.h"
 
@@ -14,13 +15,13 @@ const char args_doc[] = "TARGET";
 const char doc[] = "Scan for open ports on one or more machines.";
 
 struct nmap nmap = {
-	ALL,
-	10,
-	1,
-	1024,
-	NULL,
-	NULL,
-	NULL
+	ALL, // scan type
+	10, // number of threads
+	1, // port start
+	1024, // port end
+	NULL, // target_opt (-t argument)
+	NULL, // target_file (-t argument)
+	NULL // target_arg (non option argument)
 };
 
 struct task	*tasks = NULL;
@@ -65,5 +66,9 @@ int main(int argc, char **argv)
 	}
 	create_tasks();
 	// print_tasks(tasks);
+
+	ft_nmap();
+
+	free(tasks);
 	return (0);
 }

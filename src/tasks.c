@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <netinet/in.h>
 
 void	print_tasks(struct task *task_list)
 {
@@ -106,10 +107,12 @@ int	get_target_sockaddr(char *target, struct sockaddr_in *addr)
 	ret = getaddrinfo(target, NULL, &hints, &info);
 	if (ret || !info)
 	{
+		freeaddrinfo(info);
 		fprintf(stderr, "%s: %s\n", target, gai_strerror(ret));
 		return (1);
 	}
 	*addr = * (struct sockaddr_in *) info->ai_addr;
+	freeaddrinfo(info);
 	return (0);
 }
 
