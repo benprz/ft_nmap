@@ -34,7 +34,6 @@ void *thread_routine(void* arg) {
 }
 
 int ft_nmap() {
-
 	pthread_t *threads = malloc(nmap.threads * sizeof(pthread_t));
 	if (threads == NULL) {
 		perror("threads = malloc()-> ");
