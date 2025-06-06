@@ -3,6 +3,7 @@
 #include <argp.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 void	print_args(struct nmap args)
 {
@@ -116,4 +117,3 @@ int parse_options(int key, char *arg, struct argp_state *state)
 	}
 	return 0;
 }
-
