@@ -13,6 +13,8 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
+#include <pthread.h>
+#include <bits/pthreadtypes.h>
 
 // Query routing table for source address and port
 int get_src_addr_and_port(const char *dest_ip, struct sockaddr_in *src_addr) {
@@ -116,11 +118,46 @@ int send_syn_packet(char *dest_ip, int dest_port)
 	perror("sendto");
 	close(sock);
 	freeaddrinfo(infos);
-	return 0;
+}
+
+pthread_mutex_t task_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void *thread_routine(void* arg) {
+	UNUSED(arg);
+	while (1) {
+		pthread_mutex_lock(&task_mutex);
+		if (tasks) {
+			struct task *task = tasks;
+			tasks = tasks->next;
+			pthread_mutex_unlock(&task_mutex);
+			printf("Processing task: %s %d %d\n", inet_ntoa(task->target.sin_addr), ntohs(task->target.sin_port), task->scan);
+			free(task);
+		} else {
+			pthread_mutex_unlock(&task_mutex);
+			return NULL;
+		}
+	}
 }
 
 int ft_nmap() {
-	char* dest_ip = "104.22.45.83";
-	uint16_t dest_port = 80;
-	return send_syn_packet(dest_ip, dest_port);
+	pthread_t *threads = malloc(nmap.threads * sizeof(pthread_t));
+	if (threads == NULL) {
+		perror("threads = malloc()-> ");
+		return -1;
+	}
+
+	for (int i = 0; i < nmap.threads; i++) {
+		if (pthread_create(&threads[i], NULL, thread_routine, NULL) == -1) {
+			perror("pthread_create-> ");
+			fprintf(stderr, "trying again..\n");
+			i--;
+			continue;
+		}
+	}
+	for (int i = 0; i < nmap.threads; i++) {
+		pthread_join(threads[i], NULL);
+	}
+
+	free(threads);
+	return 0;
 }

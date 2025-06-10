@@ -1,35 +1,35 @@
 #include <error.h>
 #include <netdb.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <argp.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <stdlib.h>
 
 #include "ft_nmap.h"
 
-const char args_doc[] = "HOST ...";
-const char doc[] = "Send ICMP ECHO_REQUEST packets to network hosts."
-				   "\vOptions marked with (root only) are available only to "
-				   "superuser.";
+const char args_doc[] = "TARGET";
+const char doc[] = "Scan for open ports on one or more machines.";
 
-
-struct s_nmap g_nmap = {
-    0, //options
+struct nmap nmap = {
+	ALL, // scan type
+	10, // number of threads
+	1, // port start
+	1024, // port end
+	NULL, // target_opt (-t argument)
+	NULL, // target_file (-t argument)
+	NULL // target_arg (non option argument)
 };
 
-enum {
-	ARGP_KEY_SYN = 256,
-};
-
-#define ARGP_LONG_NAME_SYN "-sS"
-#define ARGP_LONG_NAME_SYN_REPLACE "--sS"
+struct task	*tasks = NULL;
 
 int parse_host(char *hostname)
 {
-	struct addrinfo *hostinfo;
-	struct addrinfo hints;
+	struct addrinfo	*hostinfo;
+	struct addrinfo	hints;
 	int				ret;
 
 	memset(&hints, 0, sizeof hints);
@@ -45,61 +45,30 @@ int parse_host(char *hostname)
 	return 0;
 }
 
-int parse_options(int key, char *arg, struct argp_state *state)
-{
-	UNUSED(arg);
-	switch (key)
-	{
-		case 'v':
-			g_nmap.options |= OPT_VERBOSE;
-			return todo("OPT_VERBOSE");
-
-		case ARGP_KEY_SYN:
-			g_nmap.options |= OPT_VERBOSE;
-			return todo("OPT_SCAN_SYN");
-
-		case ARGP_KEY_ARG:
-			return todo("ARGP_KEY_ARG");
-
-		case ARGP_KEY_NO_ARGS:
-			argp_error(state, "missing host operand");
-
-		/* FALLTHROUGH */
-		default:
-			return ARGP_ERR_UNKNOWN;
-	}
-	return 0;
-}
-
-void edit_long_name_options(int argc, char **argv)
-{
-	for (int i = 1; i < argc; i++) {
-		if (!strcmp(argv[i], ARGP_LONG_NAME_SYN)) {
-			argv[i] = ARGP_LONG_NAME_SYN_REPLACE;
-		}
-	}
-}
-
 int main(int argc, char **argv)
 {
- //    if (getuid() != 0)
-	// {
-	//     fprintf(stderr, "You must be root to use ft_nmap\n");
-	//     return (1);
-	// }
-
-	// ex: -sS to --sS
-	edit_long_name_options(argc, argv);
-
-	// argp
-	struct argp_option options[] = {
-		{"verbose", 'v', 0, 0, "Produce verbose output", 0},
-		{"sS", ARGP_KEY_SYN, 0, 0, "", 0},
-		{0}};
+	const struct argp_option options[] = {
+		{"target", 't', "TARGET", 0, "target (IP or hostname) to scan", 0},
+		{"file", 'f', "FILE", 0, "file containing a list of targets to scan", 0},
+		{"ports", 'p', "PORT/RANGE", 0, "target ports(s) to scan (single port or range with format (n-m) (max number of ports: 1024)", 0},
+		{"threads", 'm', "THREADS", 0, "maximum number of threads to use for the scan (default: 10) (max: 250)", 0},
+		{"scan", 's', "TYPE", 0, "type of scan to use, must be one of SYN, NULL, ACK, FIN, XMAS, UDP (all used if not specified)", 0},
+		{0}
+	};
 
 	struct argp argp = {options, parse_options, args_doc, doc, 0, 0, 0};
 	argp_parse(&argp, argc, argv, 0, 0, 0);
+	// print_args(nmap);
+	if (getuid() != 0)
+	{
+	    fprintf(stderr, "You must be root to use ft_nmap\n");
+	    return (1);
+	}
+	create_tasks();
+	// print_tasks(tasks);
 
-	// check if verbose is set
-	return ft_nmap();
+	ft_nmap();
+
+	free(tasks);
+	return (0);
 }

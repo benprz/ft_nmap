@@ -1,13 +1,13 @@
-
+#include <stddef.h>
 #include <stdio.h>
+#include <ctype.h>
+#include <stdint.h>
+
 int todo(char* msg)
 {
     printf("# TODO MESSAGE: %s\n", msg);
     return -1;
 }
-
-
-#include <stdint.h>
 
 // The checksum field is the 16 bit one's complement of the one's complement sum of all 16 bit words in the header.
 // The one's complement of a binary number is the value obtained by inverting (flipping) all the bits in the binary representation of the number.
@@ -32,4 +32,19 @@ uint16_t calculate_checksum(uint16_t *packet, int len)
 
 	// return the one's complement of sum
 	return (uint16_t)(~sum);
+}
+
+char	*trim_whitespaces(char *str)
+{
+	size_t	i = 0;
+	while (isspace(str[i]))
+		i++;
+	str += i;
+	if (!str[0])
+		return (str);
+	i = 0;
+	while (str[i] && !isspace(str[i]))
+		i++;
+	str[i] = 0;
+	return (str);
 }
