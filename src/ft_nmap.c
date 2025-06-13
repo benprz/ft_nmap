@@ -15,21 +15,22 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <bits/pthreadtypes.h>
+#include <pcap/pcap.h>
 
 // Query routing table for source address and port
-int get_src_addr_and_port(const char *dest_ip, struct sockaddr_in *src_addr) {
+int get_src_addr_and_port(const struct sockaddr_in *dest_addr, struct sockaddr_in *src_addr) {
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd < 0) {
         perror("Socket error");
         return -1;
     }
 
-    struct sockaddr_in dest_addr = {0};
-    dest_addr.sin_family = AF_INET;
-    dest_addr.sin_addr.s_addr = inet_addr(dest_ip);
-    dest_addr.sin_port = htons(9999); // Arbitrary port for routing query
+    // struct sockaddr_in dest_addr = {0};
+    // dest_addr.sin_family = AF_INET;
+    // dest_addr.sin_addr.s_addr = inet_addr(dest_ip);
+    // dest_addr.sin_port = htons(9999); // Arbitrary port for routing query
 
-    if (connect(sockfd, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) < 0) {
+    if (connect(sockfd, (struct sockaddr *)dest_addr, sizeof(struct sockaddr_in)) < 0) {
         perror("Connect error");
         close(sockfd);
         return -1;
@@ -76,51 +77,59 @@ uint16_t	checksum_for_tcp_header(struct tcphdr tcphdr, struct sockaddr_in local_
 	return (~sum);
 }
 
-int send_syn_packet(char *dest_ip, int dest_port)
+int send_syn_packet(const struct sockaddr_in* target)
 {
 	int sock;
-	int	ret;
+	// int	ret;
 	struct tcphdr	tcphdr;
-	struct addrinfo hints, *infos;
+	// struct addrinfo hints, *infos;
 	struct sockaddr_in	src_addr;
 
-	memset(&hints, 0, sizeof(struct addrinfo));
-	hints.ai_family = AF_INET;
-	ret = getaddrinfo(dest_ip, NULL, &hints, &infos);
-	if (ret)
-	{
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(ret));
-		return (1);
-	}
+	// memset(&hints, 0, sizeof(struct addrinfo));
+	// hints.ai_family = AF_INET;
+	// ret = getaddrinfo(inet_ntoa(*target), NULL, &hints, &infos);
+	// if (ret)
+	// {
+	// 	fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(ret));
+	// 	return (1);
+	// }
 	sock = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
 	if (sock < 0)
 	{
 		fprintf(stderr, "socket: %s\n", strerror(errno));
-		freeaddrinfo(infos);
+		// freeaddrinfo(infos);
 		return (2);
 	}
-	if (get_src_addr_and_port(dest_ip, &src_addr) < 0) {
+	if (get_src_addr_and_port(target, &src_addr) < 0) {
 		close(sock);
-		freeaddrinfo(infos);
+		// freeaddrinfo(infos);
 		return (3);
 	}
 	memset(&tcphdr, 0, sizeof(tcphdr));
-	tcphdr.dest = htons(dest_port);
+	tcphdr.dest = target->sin_port;
 	tcphdr.source = htons(1111);
 	srand(time(NULL));
 	tcphdr.seq = htonl(rand());
 	tcphdr.doff = 5;
 	tcphdr.syn = 1;
 	tcphdr.window = htons(5840);
-	tcphdr.check = checksum_for_tcp_header(tcphdr, src_addr, * (struct sockaddr_in *) infos->ai_addr);
+	tcphdr.check = checksum_for_tcp_header(tcphdr, src_addr, *target);
 	fprintf(stdout, "\n0x%04x\n", tcphdr.check);
-	ret = sendto(sock, &tcphdr, sizeof(tcphdr), 0, infos->ai_addr, infos->ai_addrlen);
+	sendto(sock, &tcphdr, sizeof(tcphdr), 0, (struct sockaddr *)&target->sin_addr, sizeof(struct sockaddr_in));
 	perror("sendto");
 	close(sock);
-	freeaddrinfo(infos);
+	// freeaddrinfo(infos);
+	return 0;
 }
 
 pthread_mutex_t task_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void packet_handler(u_char *user_data, const struct pcap_pkthdr *header, const u_char *packet) {
+	UNUSED(user_data);
+	UNUSED(packet);
+    printf("Packet captured: length=%d, timestamp=%ld.%ld\n", header->len, header->ts.tv_sec, header->ts.tv_usec);
+    // Process packet data here
+}
 
 void *thread_routine(void* arg) {
 	UNUSED(arg);
@@ -131,6 +140,47 @@ void *thread_routine(void* arg) {
 			tasks = tasks->next;
 			pthread_mutex_unlock(&task_mutex);
 			printf("Processing task: %s %d %d\n", inet_ntoa(task->target.sin_addr), ntohs(task->target.sin_port), task->scan);
+			char errbuf[PCAP_ERRBUF_SIZE];
+			pcap_t *handle;
+
+		 	handle = pcap_open_live("any", BUFSIZ, 1, 1000, errbuf);
+		    if (handle == NULL) {
+		        fprintf(stderr, "Error opening interface: %s\n", errbuf);
+		        return NULL;
+		    }
+		    struct bpf_program filter;
+		    char filter_exp[100] = {0};
+			sprintf(filter_exp, "src host %s && src port %d && dst port %d", inet_ntoa(task->target.sin_addr), ntohs(task->target.sin_port), task->scan);
+		    if (pcap_compile(handle, &filter, filter_exp, 0, PCAP_NETMASK_UNKNOWN) == -1) {
+		        fprintf(stderr, "Error compiling filter: %s\n", pcap_geterr(handle));
+		        pcap_close(handle);
+		        return NULL;
+		    }
+		    if (pcap_setfilter(handle, &filter) == -1) {
+		        fprintf(stderr, "Error setting filter: %s\n", pcap_geterr(handle));
+		        pcap_close(handle);
+		        return NULL;
+		    }
+
+		    printf("Listening for packets...port: %d\n", task->target.sin_port);
+			send_syn_packet(&task->target);
+			struct pcap_pkthdr pkt_hdr = {0};
+		    const u_char* pkt = pcap_next(handle, &pkt_hdr);
+			if (pkt == NULL) {
+				fprintf(stderr, "Error receiving packet: %s\n", pcap_geterr(handle));
+				pcap_close(handle);
+				free(task);
+				return NULL;
+			} else {
+				printf("Received packet: %d bytes\n", pkt_hdr.caplen);
+				printf("Packet data: ");
+				for (uint32_t i = 0; i < (uint32_t)pkt_hdr.caplen; i++) {
+					printf("%02x ", pkt[i]);
+				}
+				printf("\n");
+			}
+
+			pcap_close(handle);
 			free(task);
 		} else {
 			pthread_mutex_unlock(&task_mutex);
