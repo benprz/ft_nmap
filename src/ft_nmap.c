@@ -118,6 +118,7 @@ int send_syn_packet(char *dest_ip, int dest_port)
 	perror("sendto");
 	close(sock);
 	freeaddrinfo(infos);
+	return (0);
 }
 
 pthread_mutex_t task_mutex = PTHREAD_MUTEX_INITIALIZER;

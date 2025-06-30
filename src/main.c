@@ -47,6 +47,8 @@ int parse_host(char *hostname)
 
 int main(int argc, char **argv)
 {
+	int	ret;
+	
 	const struct argp_option options[] = {
 		{"target", 't', "TARGET", 0, "target (IP or hostname) to scan", 0},
 		{"file", 'f', "FILE", 0, "file containing a list of targets to scan", 0},
@@ -64,11 +66,10 @@ int main(int argc, char **argv)
 	    fprintf(stderr, "You must be root to use ft_nmap\n");
 	    return (1);
 	}
-	create_tasks();
-	// print_tasks(tasks);
-
-	ft_nmap();
-
-	free(tasks);
+	if (create_tasks() || ft_nmap())
+	{
+		free(tasks);
+		return (2);
+	}
 	return (0);
 }

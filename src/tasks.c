@@ -94,7 +94,7 @@ void	create_task(struct sockaddr_in addr, enum scan_type scan)
 	}
 }
 
-int	get_target_sockaddr(char *target, struct sockaddr_in *addr)
+int	get_tgt_sockaddr(char *target, struct sockaddr_in *addr)
 {
 	struct addrinfo	*info;
 	struct addrinfo	hints;
@@ -116,6 +116,11 @@ int	get_target_sockaddr(char *target, struct sockaddr_in *addr)
 	return (0);
 }
 
+// int	get_src_sockaddr(int src_socket, struct sockaddr_in tgt)
+// {
+	
+// }
+
 void	target_create_all_tasks(struct sockaddr_in addr)
 {
 	for (uint16_t i = nmap.port_start; i <= nmap.port_end; i++)
@@ -135,7 +140,7 @@ void	target_create_all_tasks(struct sockaddr_in addr)
 	}
 }
 
-void	create_tasks(void)
+int	create_tasks(void)
 {
 	struct sockaddr_in	addr;
 	FILE				*file;
@@ -150,21 +155,21 @@ void	create_tasks(void)
 		if (!file)
 		{
 			fprintf(stderr, "Error: couldn't open file: %s\n", strerror(errno));
-			exit(1);
+			return (1);
 		}
 	}
-	if (nmap.target_arg && !get_target_sockaddr(nmap.target_arg, &addr))
+	if (nmap.target_arg && !get_tgt_sockaddr(nmap.target_arg, &addr))
 		target_create_all_tasks(addr);
-	if (nmap.target_opt && !get_target_sockaddr(nmap.target_opt, &addr))
+	if (nmap.target_opt && !get_tgt_sockaddr(nmap.target_opt, &addr))
 		target_create_all_tasks(addr);
 	if (!nmap.target_file)
-		return;
+		return (0);
 	len = 0;
 	next_target = NULL;
 	while ((ret = getline(&next_target, &len, file)) != -1)
 	{
 		clean_target = trim_whitespaces(next_target);
-		if (strlen(clean_target) > 0 && !get_target_sockaddr(clean_target, &addr))
+		if (strlen(clean_target) > 0 && !get_tgt_sockaddr(clean_target, &addr))
 			target_create_all_tasks(addr);
 	}
 	if (ferror(file))
@@ -173,8 +178,9 @@ void	create_tasks(void)
 		        "Error: an error occured while trying to read the file: %s\n",
 		        strerror(errno));
 		free_task_list(tasks);
-		exit(2);
+		return (1);
 	}
 	free(next_target);
 	fclose(file);
+	return (0);
 }
