@@ -1,5 +1,6 @@
 #include <error.h>
 #include <netdb.h>
+#include <netinet/in.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <argp.h>
@@ -24,6 +25,8 @@ struct nmap nmap = {
 	NULL // target_arg (non option argument)
 };
 
+struct ports ports;
+
 struct task	*tasks = NULL;
 
 int parse_host(char *hostname)
@@ -47,8 +50,6 @@ int parse_host(char *hostname)
 
 int main(int argc, char **argv)
 {
-	int	ret;
-	
 	const struct argp_option options[] = {
 		{"target", 't', "TARGET", 0, "target (IP or hostname) to scan", 0},
 		{"file", 'f', "FILE", 0, "file containing a list of targets to scan", 0},
@@ -66,7 +67,7 @@ int main(int argc, char **argv)
 	    fprintf(stderr, "You must be root to use ft_nmap\n");
 	    return (1);
 	}
-	if (create_tasks() || ft_nmap())
+	if (create_recv_sockets() || create_tasks() || ft_nmap())
 	{
 		free(tasks);
 		return (2);
