@@ -12,7 +12,7 @@ SRC_DIR = src/
 SRC =	main.c \
 		ft_nmap.c \
 		parsing.c \
-		recv_sockets.c \
+		sockets.c \
 		tasks.c \
 		utils.c
 

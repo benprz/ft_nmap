@@ -64,6 +64,7 @@ int		parse_options(int key, char *arg, struct argp_state *state);
 int		create_tasks(void);
 void    print_tasks(struct task *task_list);
 int		create_recv_sockets(void);
+int		create_send_sockets(void);
 
 // utils functions
 int todo(char*);
@@ -72,6 +73,5 @@ uint16_t calculate_checksum(uint16_t *, int);
 void    print_args(struct nmap args);
 char	*trim_whitespaces(char *str);
 void	print_task(struct task task);
-
 
 #endif

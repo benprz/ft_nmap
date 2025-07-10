@@ -78,3 +78,20 @@ int create_recv_sockets(void)
 		return (1);
 	return (0);
 }
+
+int create_send_sockets(void)
+{
+	sockets.tcp = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
+	if (sockets.tcp == -1)
+	{
+		perror("Couldn't create send socket");
+		return (1);
+	}
+	sockets.udp = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (sockets.udp == -1)
+	{
+		perror("Couldn't create send socket");
+		return (1);
+	}
+	return (0);
+}
