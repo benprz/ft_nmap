@@ -118,6 +118,7 @@ int send_syn_packet(char *dest_ip, int dest_port)
 	perror("sendto");
 	close(sock);
 	freeaddrinfo(infos);
+	return (0);
 }
 
 pthread_mutex_t task_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -130,7 +131,8 @@ void *thread_routine(void* arg) {
 			struct task *task = tasks;
 			tasks = tasks->next;
 			pthread_mutex_unlock(&task_mutex);
-			printf("Processing task: %s %d %d\n", inet_ntoa(task->target.sin_addr), ntohs(task->target.sin_port), task->scan);
+			// printf("Processing task: %s %d %d\n", inet_ntoa(task->target.sin_addr), ntohs(task->target.sin_port), task->scan);
+			print_task(*task);
 			free(task);
 		} else {
 			pthread_mutex_unlock(&task_mutex);

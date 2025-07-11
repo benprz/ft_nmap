@@ -1,6 +1,7 @@
 #ifndef FT_NMAP_H
 #define FT_NMAP_H
 
+#include <limits.h>
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
@@ -31,17 +32,39 @@ struct	nmap
 struct	task
 {
 	struct sockaddr_in	target;
+	struct sockaddr_in	source;
 	enum scan_type		scan;
 	struct task			*next;
 };
 
-extern struct nmap nmap;
-extern struct task *tasks;
+// tous les ports sont en network byte order
+struct	ports
+{
+	unsigned short int	syn;
+	unsigned short int	null;
+	unsigned short int	ack;
+	unsigned short int	fin;
+	unsigned short int	xmas;
+	unsigned short int	udp;
+};
 
-int		ft_nmap();
+struct	sockets
+{
+	int	tcp;
+	int	udp;
+};
+
+extern struct nmap		nmap;
+extern struct ports		ports;
+extern struct sockets	sockets;
+extern struct task		*tasks;
+
+int		ft_nmap(void);
 int		parse_options(int key, char *arg, struct argp_state *state);
-void	create_tasks(void);
+int		create_tasks(void);
 void    print_tasks(struct task *task_list);
+int		create_recv_sockets(void);
+int		create_send_sockets(void);
 
 // utils functions
 int todo(char*);
@@ -49,6 +72,6 @@ int todo(char*);
 uint16_t calculate_checksum(uint16_t *, int);
 void    print_args(struct nmap args);
 char	*trim_whitespaces(char *str);
-
+void	print_task(struct task task);
 
 #endif

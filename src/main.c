@@ -1,5 +1,6 @@
 #include <error.h>
 #include <netdb.h>
+#include <netinet/in.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <argp.h>
@@ -24,7 +25,9 @@ struct nmap nmap = {
 	NULL // target_arg (non option argument)
 };
 
-struct task	*tasks = NULL;
+struct ports	ports;
+struct sockets	sockets;
+struct task		*tasks = NULL;
 
 int parse_host(char *hostname)
 {
@@ -64,11 +67,13 @@ int main(int argc, char **argv)
 	    fprintf(stderr, "You must be root to use ft_nmap\n");
 	    return (1);
 	}
-	create_tasks();
-	// print_tasks(tasks);
-
-	ft_nmap();
-
-	free(tasks);
+	if (create_recv_sockets()
+		|| create_send_sockets()
+		|| create_tasks()
+		|| ft_nmap())
+	{
+		free(tasks);
+		return (2);
+	}
 	return (0);
 }
