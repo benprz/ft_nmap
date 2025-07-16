@@ -14,6 +14,7 @@ SRC =	main.c \
 		parsing.c \
 		sockets.c \
 		tasks.c \
+		results.c \
 		utils.c
 
 OBJ_DIR = .obj/

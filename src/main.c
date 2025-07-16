@@ -9,6 +9,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <stdlib.h>
+#include <pthread.h>
 
 #include "ft_nmap.h"
 
@@ -27,7 +28,11 @@ struct nmap nmap = {
 
 struct ports	ports;
 struct sockets	sockets;
-struct task		*tasks = NULL;
+struct task		*tasks = NULL; // liste chaînée
+struct result	*results = NULL; // array
+size_t			nb_results = 0;
+pthread_mutex_t	task_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t	result_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int parse_host(char *hostname)
 {
@@ -44,7 +49,6 @@ int parse_host(char *hostname)
 		printf("Error: %s\n", gai_strerror(ret));
 		return (-1);
 	}
-	// ret = socket()
 	return 0;
 }
 

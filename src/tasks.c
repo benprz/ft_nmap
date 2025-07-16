@@ -197,28 +197,32 @@ int file_create_all_tasks(FILE *file, int src_addr_sock)
 	size_t				len;
 	struct sockaddr_in	tgt;
 	struct sockaddr_in	src;
+	int					ret;
 
 	len = 0;
 	next_target = NULL;
-	while ((getline(&next_target, &len, file)) != -1)
+	ret = 0;
+	while ((getline(&next_target, &len, file)) != -1 || ret)
 	{
 		clean_target = trim_whitespaces(next_target);
 		if (strlen(clean_target) > 0
 		    && !get_tgt_sockaddr(clean_target, &tgt)
 			&& !get_src_sockaddr(src_addr_sock, &tgt, &src))
+		{
 			target_create_all_tasks(tgt, src);
+			ret = create_target_result(tgt.sin_addr.s_addr);
+		}
 	}
 	if (ferror(file))
 	{
 		fprintf(stderr,
-		        "Error: an error occured while trying to read the file: %s\n",
+		        "Couldn't read the file: %s\n",
 		        strerror(errno));
-		free_task_list(tasks);
 		return (1);
 	}
 	free(next_target);
 	fclose(file);
-	return (0);
+	return (ret);
 }
 
 int	create_tasks(void)
@@ -227,7 +231,6 @@ int	create_tasks(void)
 	struct sockaddr_in	src;
 	FILE				*file;
 	int					src_addr_sock;
-	int					ret;
 
 	if (nmap.target_file)
 	{
@@ -235,30 +238,43 @@ int	create_tasks(void)
 		if (!file)
 		{
 			fprintf(stderr, "Error: couldn't open file: %s\n", strerror(errno));
-			return (1);
+			goto error_no_close;
 		}
 	}
 	// creation du socket udp pour obtenir l'adresse locale
 	src_addr_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (src_addr_sock < 0)
 	{
-		fclose(file);
 		fprintf(stderr, "Error: couldn't create socket: %s\n", strerror(errno));
-		return (1);
+		goto error;
 	}
 	if (nmap.target_arg
 	    	&& !get_tgt_sockaddr(nmap.target_arg, &tgt)
 			&& !get_src_sockaddr(src_addr_sock, &tgt, &src))
+	{
 		target_create_all_tasks(tgt, src);
+		if (create_target_result(tgt.sin_addr.s_addr))
+			goto error;
+	}
 	if (nmap.target_opt
 			&& !get_tgt_sockaddr(nmap.target_opt, &tgt)
 			&& !get_src_sockaddr(src_addr_sock, &tgt, &src))
+	{
 		target_create_all_tasks(tgt, src);
+		if (create_target_result(tgt.sin_addr.s_addr))
+			goto error;
+	}
 	if (nmap.target_file)
 	{
-		ret = file_create_all_tasks(file, src_addr_sock);
-		return (ret);
+		if (file_create_all_tasks(file, src_addr_sock))
+			goto error;
 	}
 	close(src_addr_sock);
 	return (0);
+error:
+	close(src_addr_sock);
+error_no_close:
+	free_task_list(tasks);
+	free_results(results);
+	return (1);
 }
