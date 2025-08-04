@@ -121,8 +121,6 @@ int send_syn_packet(char *dest_ip, int dest_port)
 	return (0);
 }
 
-pthread_mutex_t task_mutex = PTHREAD_MUTEX_INITIALIZER;
-
 void *thread_routine(void* arg) {
 	UNUSED(arg);
 	while (1) {
@@ -132,7 +130,7 @@ void *thread_routine(void* arg) {
 			tasks = tasks->next;
 			pthread_mutex_unlock(&task_mutex);
 			// printf("Processing task: %s %d %d\n", inet_ntoa(task->target.sin_addr), ntohs(task->target.sin_port), task->scan);
-			print_task(*task);
+			// print_task(*task);
 			free(task);
 		} else {
 			pthread_mutex_unlock(&task_mutex);
