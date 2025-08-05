@@ -1,5 +1,6 @@
 #include <error.h>
 #include <netdb.h>
+#include <netinet/in.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <argp.h>
@@ -8,6 +9,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <stdlib.h>
+#include <pthread.h>
 
 #include "ft_nmap.h"
 
@@ -24,7 +26,13 @@ struct nmap nmap = {
 	NULL // target_arg (non option argument)
 };
 
-struct task	*tasks = NULL;
+struct ports	ports;
+struct sockets	sockets;
+struct task		*tasks = NULL; // liste chaînée
+struct result	*results = NULL; // array
+size_t			nb_results = 0;
+pthread_mutex_t	task_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t	result_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int parse_host(char *hostname)
 {
@@ -41,7 +49,6 @@ int parse_host(char *hostname)
 		printf("Error: %s\n", gai_strerror(ret));
 		return (-1);
 	}
-	// ret = socket()
 	return 0;
 }
 
@@ -64,11 +71,13 @@ int main(int argc, char **argv)
 	    fprintf(stderr, "You must be root to use ft_nmap\n");
 	    return (1);
 	}
-	create_tasks();
-	// print_tasks(tasks);
-
-	ft_nmap();
-
-	free(tasks);
+	if (create_recv_sockets()
+		|| create_send_sockets()
+		|| create_tasks()
+		|| ft_nmap())
+	{
+		free(tasks);
+		return (2);
+	}
 	return (0);
 }

@@ -1,6 +1,8 @@
 #ifndef FT_NMAP_H
 #define FT_NMAP_H
 
+#include <limits.h>
+#include <stddef.h>
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
@@ -9,12 +11,18 @@
 #include <sys/socket.h>
 #include <argp.h>
 #include <netinet/in.h>
+#include <stdbool.h>
 
 #define UNUSED(x) (void)x
 
 enum	scan_type
 {
 	ALL, SYN, NUL, ACK, FIN, XMAS, UDP
+};
+
+enum	scan_result
+{
+	OP, CL, FIL, UNFIL, OPFIL
 };
 
 struct	nmap
@@ -31,17 +39,53 @@ struct	nmap
 struct	task
 {
 	struct sockaddr_in	target;
+	struct sockaddr_in	source;
 	enum scan_type		scan;
 	struct task			*next;
 };
 
-extern struct nmap nmap;
-extern struct task *tasks;
+struct	result
+{
+	in_addr_t	target;
+	uint32_t	*results; // utilisation: (results[port - nmap.port_start] >> (scan_type * 3)) & 0b111
+};
 
-int		ft_nmap();
+// tous les ports sont en network byte order
+struct	ports
+{
+	unsigned short int	syn;
+	unsigned short int	null;
+	unsigned short int	ack;
+	unsigned short int	fin;
+	unsigned short int	xmas;
+	unsigned short int	udp;
+};
+
+struct	sockets
+{
+	int	tcp;
+	int	udp;
+};
+
+extern struct nmap		nmap;
+extern struct ports		ports;
+extern struct sockets	sockets;
+extern struct task		*tasks;
+extern struct result	*results;
+extern size_t			nb_results;
+extern pthread_mutex_t	task_mutex;
+extern pthread_mutex_t	result_mutex;
+
+int		ft_nmap(void);
 int		parse_options(int key, char *arg, struct argp_state *state);
-void	create_tasks(void);
+int		create_tasks(void);
 void    print_tasks(struct task *task_list);
+int		create_recv_sockets(void);
+int		create_send_sockets(void);
+void	add_result(in_addr_t target, unsigned short port,  enum scan_type scan,
+					enum scan_result result);
+int		create_target_result(in_addr_t target);
+void	free_results(struct result *results);
 
 // utils functions
 int todo(char*);
@@ -49,6 +93,6 @@ int todo(char*);
 uint16_t calculate_checksum(uint16_t *, int);
 void    print_args(struct nmap args);
 char	*trim_whitespaces(char *str);
-
+void	print_task(struct task task);
 
 #endif
