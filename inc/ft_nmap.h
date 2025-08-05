@@ -86,6 +86,7 @@ void	add_result(in_addr_t target, unsigned short port,  enum scan_type scan,
 					enum scan_result result);
 int		create_target_result(in_addr_t target);
 void	free_results(struct result *results);
+void	*icmp_thread(void* arg);
 
 // utils functions
 int todo(char*);

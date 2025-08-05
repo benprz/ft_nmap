@@ -140,13 +140,21 @@ void *thread_routine(void* arg) {
 }
 
 int ft_nmap() {
-	pthread_t *threads = malloc(nmap.threads * sizeof(pthread_t));
+	pthread_t *threads;
+
+	nmap.threads++; // + 1 for the icmp thread
+	threads = malloc((nmap.threads) * sizeof(pthread_t));
 	if (threads == NULL) {
 		perror("threads = malloc()-> ");
 		return -1;
 	}
-
-	for (int i = 0; i < nmap.threads; i++) {
+	if (pthread_create(&threads[0], NULL, icmp_thread, NULL) == -1)
+	{
+		perror("pthread_create-> ");
+		free(threads);
+		return (1);
+	}
+	for (int i = 1; i < nmap.threads; i++) {
 		if (pthread_create(&threads[i], NULL, thread_routine, NULL) == -1) {
 			perror("pthread_create-> ");
 			fprintf(stderr, "trying again..\n");
