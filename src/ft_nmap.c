@@ -157,9 +157,8 @@ int ft_nmap() {
 	for (int i = 1; i < nmap.threads; i++) {
 		if (pthread_create(&threads[i], NULL, thread_routine, NULL) == -1) {
 			perror("pthread_create-> ");
-			fprintf(stderr, "trying again..\n");
-			i--;
-			continue;
+			free(threads);
+			return (1);
 		}
 	}
 	for (int i = 0; i < nmap.threads; i++) {
