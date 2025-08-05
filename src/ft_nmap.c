@@ -115,7 +115,7 @@ int send_syn_packet(const struct sockaddr_in* target)
 	tcphdr.window = htons(5840);
 	tcphdr.check = checksum_for_tcp_header(tcphdr, src_addr, *target);
 	fprintf(stdout, "\n0x%04x\n", tcphdr.check);
-	sendto(sock, &tcphdr, sizeof(tcphdr), 0, (struct sockaddr *)&target->sin_addr, sizeof(struct sockaddr_in));
+	sendto(sock, &tcphdr, sizeof(tcphdr), 0, (struct sockaddr *)target, sizeof(struct sockaddr_in));
 	perror("sendto");
 	close(sock);
 	// freeaddrinfo(infos);
