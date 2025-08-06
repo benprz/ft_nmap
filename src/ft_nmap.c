@@ -129,6 +129,7 @@ void *thread_routine(void* arg) {
 			struct task *task = tasks;
 			tasks = tasks->next;
 			pthread_mutex_unlock(&task_mutex);
+			sleep(5);
 			// printf("Processing task: %s %d %d\n", inet_ntoa(task->target.sin_addr), ntohs(task->target.sin_port), task->scan);
 			// print_task(*task);
 			free(task);
@@ -161,10 +162,9 @@ int ft_nmap() {
 			return (1);
 		}
 	}
-	for (int i = 0; i < nmap.threads; i++) {
+	for (int i = 1; i < nmap.threads; i++) {
 		pthread_join(threads[i], NULL);
 	}
-
 	free(threads);
 	return 0;
 }
