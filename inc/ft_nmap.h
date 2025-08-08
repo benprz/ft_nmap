@@ -22,8 +22,12 @@ enum	scan_type
 
 enum	scan_result
 {
-	OP, CL, FIL, UNFIL, OPFIL
+	SR_OPEN, SR_CLOSED, SR_FILTERED, SR_UNFILTERED, SR_OPEN_FILTERED
 };
+
+// 1 second, which is the default timeout for nmap, you can check it with -Pn option
+// -Pn option means that the scan will be performed without pinging the target, so no timeout measurement is done (which helps to speed up the scan)
+#define INITIAL_RTT_TIMEOUT 1000 
 
 struct	nmap
 {
