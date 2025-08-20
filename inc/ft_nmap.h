@@ -14,6 +14,8 @@
 #include <stdbool.h>
 
 #define UNUSED(x) (void)x
+#define TCP_FILTER_SIZE 432
+#define TCP_FILTER_FORMAT "ip src %u.%u.%u.%u && dst %u.%u.%u.%u && ((tcp && src port %u && dst port %u) || (icmp && icmp[icmptype] == 3 && (icmp[icmpcode] == 0 || icmp[icmpcode] == 1 || icmp[icmpcode] == 2 || icmp[icmpcode] == 3 || icmp[icmpcode] == 9 || icmp[icmpcode] == 10 || icmp[icmpcode] == 13) && (icmp[8] & 0xf0) == 0x40 && icmp[17] == 6 && icmp[8 + ((icmp[8] & 0xf) * 4):2] == %u && icmp[8 + ((icmp[8] & 0xf) * 4) + 2:2] == %u))"
 
 enum	scan_type
 {
