@@ -42,7 +42,8 @@ error:
 	return (1);
 }
 
-void	add_result(in_addr_t target, unsigned short port,  enum scan_type scan,
+// port needs to be in host byte order when passed to the function
+void	add_result(in_addr_t target, unsigned short port, enum scan_type scan,
 					enum scan_result result)
 {
 	size_t	i;
