@@ -15,6 +15,8 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <bits/pthreadtypes.h>
+#include <pcap/pcap.h>
+#include <pcap/sll.h>
 
 // Query routing table for source address and port
 int get_src_addr_and_port(const char *dest_ip, struct sockaddr_in *src_addr) {
@@ -123,6 +125,15 @@ int send_syn_packet(char *dest_ip, int dest_port)
 
 void *thread_routine(void* arg) {
 	UNUSED(arg);
+	pcap_t *handle;
+	char	errbuf[PCAP_ERRBUF_SIZE];
+
+	handle = pcap_open_live(NULL, BUFSIZ, 0, 1, errbuf);
+	if (!handle)
+	{
+		fprintf(stderr, "Couldn't open devices: %s\n", errbuf);
+		return (NULL);
+	}
 	while (1) {
 		pthread_mutex_lock(&task_mutex);
 		if (tasks) {
@@ -130,9 +141,12 @@ void *thread_routine(void* arg) {
 			tasks = tasks->next;
 			pthread_mutex_unlock(&task_mutex);
 			// printf("Processing task: %s %d %d\n", inet_ntoa(task->target.sin_addr), ntohs(task->target.sin_port), task->scan);
+			if (task->scan == ACK)
+				ack(handle, task->source, task->target);
 			// print_task(*task);
 			free(task);
 		} else {
+			pcap_close(handle);
 			pthread_mutex_unlock(&task_mutex);
 			return NULL;
 		}

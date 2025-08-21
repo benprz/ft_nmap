@@ -12,6 +12,7 @@
 #include <argp.h>
 #include <netinet/in.h>
 #include <stdbool.h>
+#include <pcap/pcap.h>
 
 #define UNUSED(x) (void)x
 #define TCP_FILTER_SIZE 432
@@ -88,6 +89,11 @@ void	add_result(in_addr_t target, unsigned short port,  enum scan_type scan,
 					enum scan_result result);
 int		create_target_result(in_addr_t target);
 void	free_results(struct result *results);
+void	ack(pcap_t *handle, struct sockaddr_in src, struct sockaddr_in tgt);
+int		setup_pcap_tcp(pcap_t *handle, struct sockaddr_in src,
+						struct sockaddr_in tgt);
+int		fill_tcp_filter(struct sockaddr_in src, struct sockaddr_in tgt,
+						char *buff);
 
 // utils functions
 int todo(char*);
