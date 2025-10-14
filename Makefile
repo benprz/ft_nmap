@@ -32,8 +32,8 @@ $(OBJ_DIR)%.o: $(SRC_DIR)%.c $(addprefix $(INC_DIR),$(INC))
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@ -I $(INC_DIR)
 
-run:
-	./$(EXE) host
+run: all
+	sudo ./$(EXE) -p 443 -s SYN wikipedia.org
 
 strace: $(EXE)
 	strace ./$(EXE) host

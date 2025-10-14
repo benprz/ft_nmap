@@ -81,5 +81,6 @@ int main(int argc, char **argv)
 		free(tasks);
 		return (2);
 	}
+	print_results();
 	return (0);
 }

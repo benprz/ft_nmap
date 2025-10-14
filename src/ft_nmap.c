@@ -18,36 +18,6 @@
 #include <pcap/pcap.h>
 #include <sys/select.h>
 
-// Query routing table for source address and port
-int get_src_addr_and_port(const struct sockaddr_in *dest_addr, struct sockaddr_in *src_addr) {
-    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0) {
-        perror("Socket error");
-        return -1;
-    }
-
-    // struct sockaddr_in dest_addr = {0};
-    // dest_addr.sin_family = AF_INET;
-    // dest_addr.sin_addr.s_addr = inet_addr(dest_ip);
-    // dest_addr.sin_port = htons(9999); // Arbitrary port for routing query
-
-    if (connect(sockfd, (struct sockaddr *)dest_addr, sizeof(struct sockaddr_in)) < 0) {
-        perror("Connect error");
-        close(sockfd);
-        return -1;
-    }
-
-    socklen_t src_addr_len = sizeof(struct sockaddr_in);
-    if (getsockname(sockfd, (struct sockaddr *)src_addr, &src_addr_len) < 0) {
-        perror("Getsockname error");
-        close(sockfd);
-        return -1;
-    }
-
-    close(sockfd);
-    return 0;
-}
-
 uint16_t	checksum_for_tcp_header(struct tcphdr tcphdr, struct sockaddr_in local_addr, struct sockaddr_in dest_addr)
 {
 	size_t			i;
@@ -78,33 +48,16 @@ uint16_t	checksum_for_tcp_header(struct tcphdr tcphdr, struct sockaddr_in local_
 	return (~sum);
 }
 
-int send_syn_packet(const struct sockaddr_in* target)
+int send_syn_packet(const struct sockaddr_in* target, const struct sockaddr_in* src_addr)
 {
 	int sock;
-	// int	ret;
 	struct tcphdr	tcphdr;
-	// struct addrinfo hints, *infos;
-	struct sockaddr_in	src_addr;
 
-	// memset(&hints, 0, sizeof(struct addrinfo));
-	// hints.ai_family = AF_INET;
-	// ret = getaddrinfo(inet_ntoa(*target), NULL, &hints, &infos);
-	// if (ret)
-	// {
-	// 	fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(ret));
-	// 	return (1);
-	// }
 	sock = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
 	if (sock < 0)
 	{
 		fprintf(stderr, "socket: %s\n", strerror(errno));
-		// freeaddrinfo(infos);
 		return (2);
-	}
-	if (get_src_addr_and_port(target, &src_addr) < 0) {
-		close(sock);
-		// freeaddrinfo(infos);
-		return (3);
 	}
 	memset(&tcphdr, 0, sizeof(tcphdr));
 	tcphdr.dest = target->sin_port;
@@ -114,12 +67,11 @@ int send_syn_packet(const struct sockaddr_in* target)
 	tcphdr.doff = 5;
 	tcphdr.syn = 1;
 	tcphdr.window = htons(5840);
-	tcphdr.check = checksum_for_tcp_header(tcphdr, src_addr, *target);
+	tcphdr.check = checksum_for_tcp_header(tcphdr, *src_addr, *target);
 	fprintf(stdout, "\nchecksum:0x%04x\n", tcphdr.check);
 	if (sendto(sock, &tcphdr, sizeof(tcphdr), 0, (struct sockaddr *)target, sizeof(struct sockaddr_in)) < 0)
 		perror("sendto");
 	close(sock);
-	// freeaddrinfo(infos);
 	return 0;
 }
 
@@ -213,10 +165,140 @@ void print_packet_tshark_style(const u_char *pkt, struct pcap_pkthdr *pkt_hdr) {
 }
 
 void packet_handler(u_char *user_data, const struct pcap_pkthdr *header, const u_char *packet) {
-	UNUSED(user_data);
-	UNUSED(packet);
-    printf("Packet captured: length=%d, timestamp=%ld.%ld\n", header->len, header->ts.tv_sec, header->ts.tv_usec);
-    // Process packet data here
+	struct task *task = (struct task *)user_data;
+	if (!task) return;
+	// Basic decode for SLL + IPv4 + TCP
+	if (header->caplen < 16 + 20 + 20) return;
+	const unsigned char *ip = packet + 16;
+	uint8_t ip_vhl = ip[0];
+	uint8_t ip_version = ip_vhl >> 4;
+	uint8_t ip_hlen = (ip_vhl & 0x0F) * 4;
+	if (ip_version != 4) return;
+	if (header->caplen < (bpf_u_int32)(16 + ip_hlen + 20)) return;
+	if (ip[9] != IPPROTO_TCP) return;
+	const unsigned char *tcp = packet + 16 + ip_hlen;
+	uint16_t dst_port = (tcp[2] << 8) | tcp[3];
+	uint8_t flags = tcp[13];
+	// Expect dst port to be our ephemeral source (ports.syn)
+	if (dst_port != ntohs(ports.syn)) return;
+	// Interpret SYN/ACK as open, RST as closed; else filtered
+	enum scan_result r = SR_FILTERED;
+	if ((flags & 0x12) == 0x12) r = SR_OPEN; // SYN+ACK
+	else if (flags & 0x04) r = SR_CLOSED;    // RST
+	add_result(task->target.sin_addr.s_addr, ntohs(task->target.sin_port), task->scan, r);
+}
+
+pcap_t *setup_pcap_handle(void) {
+	char errbuf[PCAP_ERRBUF_SIZE];
+	pcap_t *handle;
+
+	// Use pcap_create() for better control over configuration
+	handle = pcap_create("any", errbuf);
+	if (handle == NULL) {
+		fprintf(stderr, "Error creating pcap handle: %s\n", errbuf);
+		return NULL;
+	}
+	
+	// Set buffer size
+	if (pcap_set_snaplen(handle, BUFSIZ) != 0) {
+		fprintf(stderr, "Error setting snaplen: %s\n", pcap_geterr(handle));
+		pcap_close(handle);
+		return NULL;
+	}
+	
+	// Set timeout for packet capture
+	if (pcap_set_timeout(handle, INITIAL_RTT_TIMEOUT) != 0) {
+		fprintf(stderr, "Error setting timeout: %s\n", pcap_geterr(handle));
+		pcap_close(handle);
+		return NULL;
+	}
+	
+	// Activate the handle
+	if (pcap_activate(handle) != 0) {
+		fprintf(stderr, "Error activating pcap handle: %s\n", pcap_geterr(handle));
+		pcap_close(handle);
+		return NULL;
+	}
+
+	// Make capture non-blocking so we can enforce our own timeout
+	char nb_err[PCAP_ERRBUF_SIZE] = {0};
+	if (pcap_setnonblock(handle, 1, nb_err) == -1) {
+		fprintf(stderr, "Error setting nonblock: %s\n", nb_err);
+		pcap_close(handle);
+		return NULL;
+	}
+
+	return handle;
+}
+
+int setup_pcap_filter(pcap_t *handle, const struct task *task) {
+	struct bpf_program filter;
+	char filter_exp[TCP_FILTER_SIZE] = {0}; // \0 terminated string
+	int ret;
+	
+	printf("FILTER EXP: Using TCP_FILTER_FORMAT macro\n");
+	ret = snprintf(filter_exp, TCP_FILTER_SIZE, TCP_FILTER_FORMAT,
+					task->source.sin_addr.s_addr & 0xff,
+					(task->source.sin_addr.s_addr >> 8) & 0xff,
+					(task->source.sin_addr.s_addr >> 16) & 0xff,
+					(task->source.sin_addr.s_addr >> 24) & 0xff,
+					task->target.sin_addr.s_addr & 0xff,
+					(task->target.sin_addr.s_addr >> 8) & 0xff,
+					(task->target.sin_addr.s_addr >> 16) & 0xff,
+					(task->target.sin_addr.s_addr >> 24) & 0xff,
+					ntohs(task->target.sin_port),
+					ntohs(ports.syn),
+					ntohs(ports.syn),
+					ntohs(task->target.sin_port));
+	if (ret >= TCP_FILTER_SIZE) {
+		fprintf(stderr, "Filter expression too long\n");
+		return -1;
+	}
+	printf("Generated filter: %s\n", filter_exp);
+	if (pcap_compile(handle, &filter, filter_exp, 0, PCAP_NETMASK_UNKNOWN) == -1) {
+		fprintf(stderr, "Error compiling filter: %s\n", pcap_geterr(handle));
+		return -1;
+	}
+	if (pcap_setfilter(handle, &filter) == -1) {
+		fprintf(stderr, "Error setting filter: %s\n", pcap_geterr(handle));
+		return -1;
+	}
+	return 0;
+}
+
+int capture_packets(pcap_t *handle, struct task *task) {
+	printf("Listening for packets...port: %d\n", ntohs(task->target.sin_port));
+	send_syn_packet(&task->target, &task->source);
+
+	// Try to read packet with timeout
+	printf("Waiting for packet with timeout: %d seconds\n", INITIAL_RTT_TIMEOUT / 1000);
+	
+	// Non-blocking poll for up to INITIAL_RTT_TIMEOUT milliseconds
+	struct pcap_pkthdr *pkt_hdr = NULL;
+	const u_char* pkt;
+	int elapsed_ms = 0;
+	int got_packet = 0;
+	
+	while (elapsed_ms < INITIAL_RTT_TIMEOUT) {
+		int result = pcap_next_ex(handle, &pkt_hdr, &pkt);
+		if (result == 1) {
+			packet_handler((u_char*)task, pkt_hdr, pkt);
+			got_packet = 1;
+			break;
+		} else if (result == -1) {
+			fprintf(stderr, "Error receiving packet: %s\n", pcap_geterr(handle));
+			break;
+		}
+		usleep(10 * 1000); // 10ms
+		elapsed_ms += 10;
+	}
+	
+	if (!got_packet) {
+		printf("Timeout: No packet received within %d seconds\n", INITIAL_RTT_TIMEOUT / 1000);
+		add_result(task->target.sin_addr.s_addr, ntohs(task->target.sin_port), task->scan, SR_FILTERED);
+	}
+	
+	return got_packet;
 }
 
 void *thread_routine(void* arg) {
@@ -227,92 +309,26 @@ void *thread_routine(void* arg) {
 			struct task *task = tasks;
 			tasks = tasks->next;
 			pthread_mutex_unlock(&task_mutex);
-			printf("Processing task: %s %d %d\n", inet_ntoa(task->target.sin_addr), ntohs(task->target.sin_port), task->scan);
-			char errbuf[PCAP_ERRBUF_SIZE];
-			pcap_t *handle;
-
-		 	// Use pcap_create() for better control over configuration
-		 	handle = pcap_create("any", errbuf);
-		    if (handle == NULL) {
-		        fprintf(stderr, "Error creating pcap handle: %s\n", errbuf);
-		        return NULL;
-		    }
-		    
-		    // Set buffer size
-		    if (pcap_set_snaplen(handle, BUFSIZ) != 0) {
-		        fprintf(stderr, "Error setting snaplen: %s\n", pcap_geterr(handle));
-		        pcap_close(handle);
-		        return NULL;
-		    }
-		    
-		    // Set timeout for packet capture
-		    if (pcap_set_timeout(handle, INITIAL_RTT_TIMEOUT) != 0) {
-		        fprintf(stderr, "Error setting timeout: %s\n", pcap_geterr(handle));
-		        pcap_close(handle);
-		        return NULL;
-		    }
-		    
-		    // Activate the handle
-		    if (pcap_activate(handle) != 0) {
-		        fprintf(stderr, "Error activating pcap handle: %s\n", pcap_geterr(handle));
-		        pcap_close(handle);
-		        return NULL;
-		    }
-		    struct bpf_program filter;
-		    char filter_exp[100] = {0};
-			printf("FILTER EXP: src host %s && src port %d && dst port %d\n", \
-				inet_ntoa(task->target.sin_addr), \
-				ntohs(task->target.sin_port), \
-				ntohs(ports.syn)
-			);
-			sprintf(filter_exp, "src host %s && src port %d && dst port %d", \
-				inet_ntoa(task->target.sin_addr), \
-				ntohs(task->target.sin_port), \
-				ntohs(ports.syn)
-			);
-		    if (pcap_compile(handle, &filter, filter_exp, 0, PCAP_NETMASK_UNKNOWN) == -1) {
-		        fprintf(stderr, "Error compiling filter: %s\n", pcap_geterr(handle));
-		        pcap_close(handle);
-		        return NULL;
-		    }
-		    if (pcap_setfilter(handle, &filter) == -1) {
-		        fprintf(stderr, "Error setting filter: %s\n", pcap_geterr(handle));
-		        pcap_close(handle);
-		        return NULL;
-		    }
-
-		    printf("Listening for packets...port: %d\n", ntohs(task->target.sin_port));
-			send_syn_packet(&task->target);
-
-			// Try to read packet with timeout
-			printf("Waiting for packet with timeout: %d seconds\n", INITIAL_RTT_TIMEOUT / 1000);
 			
-			// Data is available, try to read packet
-			struct pcap_pkthdr *pkt_hdr = NULL;
-		    const u_char* pkt;
-		    int result = pcap_next_ex(handle, &pkt_hdr, &pkt);
-			if (result == -1) {
-				// Error occurred
-				fprintf(stderr, "Error receiving packet: %s\n", pcap_geterr(handle));
+			printf("Processing task: %s %d %d\n", inet_ntoa(task->target.sin_addr), ntohs(task->target.sin_port), task->scan);
+			
+			// Setup pcap handle
+			pcap_t *handle = setup_pcap_handle();
+			if (handle == NULL) {
+				free(task);
+				continue;
+			}
+			
+			// Setup pcap filter
+			if (setup_pcap_filter(handle, task) < 0) {
 				pcap_close(handle);
 				free(task);
-				return NULL;
-			} else if (result == 0) {
-				// Timeout occurred
-				printf("Timeout: No packet received within %d seconds\n", INITIAL_RTT_TIMEOUT / 1000);
-				pcap_close(handle);
-				return NULL;
-			} else {
-				// Packet received successfully
-				printf("Received packet: %d bytes\n", pkt_hdr->caplen);
-				printf("Packet data: ");
-				for (uint32_t i = 0; i < (uint32_t)pkt_hdr->caplen; i++) {
-					printf("%02x ", pkt[i]);
-				}
-				printf("\n");
-				print_packet_tshark_style(pkt, pkt_hdr);
+				continue;
 			}
-
+			
+			// Capture packets and send SYN
+			capture_packets(handle, task);
+			
 			pcap_close(handle);
 			free(task);
 		} else {
@@ -332,8 +348,7 @@ int ft_nmap() {
 	for (int i = 0; i < nmap.threads; i++) {
 		if (pthread_create(&threads[i], NULL, thread_routine, NULL) == -1) {
 			perror("pthread_create-> ");
-			fprintf(stderr, "trying again..\n");
-			i--;
+			fprintf(stderr, "failed to create one thread..\n");
 			continue;
 		}
 	}
