@@ -1,6 +1,7 @@
 #include "ft_nmap.h"
 
 #include <netinet/in.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -127,11 +128,24 @@ void *thread_routine(void* arg) {
 	UNUSED(arg);
 	pcap_t *handle;
 	char	errbuf[PCAP_ERRBUF_SIZE];
+	int		ret;
 
-	handle = pcap_open_live(NULL, BUFSIZ, 0, 1, errbuf);
+	// pcap_create ?
+	// handle = pcap_open_live(NULL, BUFSIZ, 0, 1000, errbuf);
+	handle = pcap_create(NULL, errbuf);
 	if (!handle)
 	{
 		fprintf(stderr, "Couldn't open devices: %s\n", errbuf);
+		return (NULL);
+	}
+	pcap_set_snaplen(handle, 65535);
+	pcap_set_buffer_size(handle, 1024 * 1024);
+	pcap_set_immediate_mode(handle, true);
+	ret = pcap_activate(handle);
+	if (ret)
+	{
+		pcap_perror(handle, "pcap_activate");
+		pcap_close(handle);
 		return (NULL);
 	}
 	while (1) {

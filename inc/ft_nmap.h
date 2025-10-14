@@ -15,8 +15,9 @@
 #include <pcap/pcap.h>
 
 #define UNUSED(x) (void)x
-#define TCP_FILTER_SIZE 432
+#define TCP_FILTER_SIZE 450
 #define TCP_FILTER_FORMAT "ip src %u.%u.%u.%u && dst %u.%u.%u.%u && ((tcp && src port %u && dst port %u) || (icmp && icmp[icmptype] == 3 && (icmp[icmpcode] == 0 || icmp[icmpcode] == 1 || icmp[icmpcode] == 2 || icmp[icmpcode] == 3 || icmp[icmpcode] == 9 || icmp[icmpcode] == 10 || icmp[icmpcode] == 13) && (icmp[8] & 0xf0) == 0x40 && icmp[17] == 6 && icmp[8 + ((icmp[8] & 0xf) * 4):2] == %u && icmp[8 + ((icmp[8] & 0xf) * 4) + 2:2] == %u))"
+// #define TCP_FILTER_FORMAT "ip src %u.%u.%u.%u && dst %u.%u.%u.%u && ((tcp && src port %u && dst port %u) || (icmp && icmp[icmptype] == 3 && (icmp[icmpcode] == 0 || icmp[icmpcode] == 1 || icmp[icmpcode] == 2 || icmp[icmpcode] == 3 || icmp[icmpcode] == 9 || icmp[icmpcode] == 10 || icmp[icmpcode] == 13)))"
 
 enum	scan_type
 {
@@ -91,9 +92,11 @@ int		create_target_result(in_addr_t target);
 void	free_results(struct result *results);
 void	ack(pcap_t *handle, struct sockaddr_in src, struct sockaddr_in tgt);
 int		setup_pcap_tcp(pcap_t *handle, struct sockaddr_in src,
-						struct sockaddr_in tgt);
+						struct sockaddr_in tgt, struct bpf_program *fp);
 int		fill_tcp_filter(struct sockaddr_in src, struct sockaddr_in tgt,
 						char *buff);
+int		send_probe(struct sockaddr_in src, struct sockaddr_in tgt,
+					enum scan_type scan);
 
 // utils functions
 int todo(char*);
