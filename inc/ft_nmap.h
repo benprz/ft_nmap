@@ -22,8 +22,46 @@ enum	scan_type
 
 enum	scan_result
 {
-	OP, CL, FIL, UNFIL, OPFIL
+	SR_OPEN, SR_CLOSED, SR_FILTERED, SR_UNFILTERED, SR_OPEN_FILTERED
 };
+
+// 1 second, which is the default timeout for nmap, you can check it with -Pn option
+// -Pn option means that the scan will be performed without pinging the target, so no timeout measurement is done (which helps to speed up the scan)
+#define INITIAL_RTT_TIMEOUT 1000 
+
+// BPF filter for capturing relevant packets for port TCP/SYN scan result
+// https://nmap.org/book/synscan.html
+// - Only allows packets with:
+//   * Specific IP source address (%u.%u.%u.%u)
+//   * Specific IP destination address (%u.%u.%u.%u)
+// - Either:
+//     a) TCP packets with given src/dst port
+//     b) ICMP packets indicating error about those ports
+#define TCP_FILTER_FORMAT \
+	/* Match the source and destination IP addresses */ \
+	"ip src %u.%u.%u.%u && dst %u.%u.%u.%u && (" \
+		/* TCP response: src port %u, dst port %u */ \
+		"(tcp && src port %u && dst port %u) || " \
+		/* Or, match specific ICMP type/codes indicating filtering or unreachable */ \
+		"(icmp && icmp[icmptype] == 3 && " \
+			/* ICMP codes: 0,1,2,3,9,10,13 */ \
+			"(icmp[icmpcode] == 0 || " \
+			"icmp[icmpcode] == 1 || " \
+			"icmp[icmpcode] == 2 || " \
+			"icmp[icmpcode] == 3 || " \
+			"icmp[icmpcode] == 9 || " \
+			"icmp[icmpcode] == 10 || " \
+			"icmp[icmpcode] == 13) && " \
+			/* Inner IP header version must be IPv4 */ \
+			"(icmp[8] & 0xf0) == 0x40 && " \
+			/* Inner protocol is TCP (protocol number 6) */ \
+			"icmp[17] == 6 && " \
+			/* Inner TCP src port == %u, dst port == %u */ \
+			"icmp[8 + ((icmp[8] & 0xf) * 4):2] == %u && " \
+			"icmp[8 + ((icmp[8] & 0xf) * 4) + 2:2] == %u" \
+		")" \
+	")"
+#define TCP_FILTER_SIZE 432
 
 struct	nmap
 {
@@ -86,6 +124,7 @@ void	add_result(in_addr_t target, unsigned short port,  enum scan_type scan,
 					enum scan_result result);
 int		create_target_result(in_addr_t target);
 void	free_results(struct result *results);
+void	print_results(void);
 
 // utils functions
 int todo(char*);
@@ -94,5 +133,6 @@ uint16_t calculate_checksum(uint16_t *, int);
 void    print_args(struct nmap args);
 char	*trim_whitespaces(char *str);
 void	print_task(struct task task);
+const char *scan_result_to_str(enum scan_result r);
 
 #endif

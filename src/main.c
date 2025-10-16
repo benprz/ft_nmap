@@ -52,6 +52,8 @@ int parse_host(char *hostname)
 	return 0;
 }
 
+
+// lpcap 1.8.0 minimum version (see pcap_compile man page)
 int main(int argc, char **argv)
 {
 	const struct argp_option options[] = {
@@ -79,5 +81,6 @@ int main(int argc, char **argv)
 		free(tasks);
 		return (2);
 	}
+	print_results();
 	return (0);
 }
