@@ -59,7 +59,7 @@ void	add_result(in_addr_t target, unsigned short port,  enum scan_type scan,
 	pthread_mutex_unlock(&result_mutex);
 }
 
-static const char *scan_result_to_str(enum scan_result r)
+const char *scan_result_to_str(enum scan_result r)
 {
     switch (r)
     {
@@ -88,9 +88,7 @@ void	print_results(void)
             enum scan_result syn_res = (enum scan_result)((value >> (SYN * 3)) & 0x7);
             if (nmap.scan == SYN || nmap.scan == ALL)
             {
-                // Only print ports we have a result for (non-zero)
-                if (syn_res != 0)
-                    printf("  %u/tcp (SYN): %s\n", port, scan_result_to_str(syn_res));
+                printf("  %u/tcp (SYN): %s\n", port, scan_result_to_str(syn_res));
             }
         }
     }

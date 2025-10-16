@@ -133,5 +133,6 @@ uint16_t calculate_checksum(uint16_t *, int);
 void    print_args(struct nmap args);
 char	*trim_whitespaces(char *str);
 void	print_task(struct task task);
+const char *scan_result_to_str(enum scan_result r);
 
 #endif

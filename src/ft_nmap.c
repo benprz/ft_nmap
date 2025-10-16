@@ -185,6 +185,17 @@ void packet_handler(u_char *user_data, const struct pcap_pkthdr *header, const u
 	enum scan_result r = SR_FILTERED;
 	if ((flags & 0x12) == 0x12) r = SR_OPEN; // SYN+ACK
 	else if (flags & 0x04) r = SR_CLOSED;    // RST
+
+    // Debug: print immediate result for this packet
+    char target_ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &task->target.sin_addr, target_ip, sizeof(target_ip));
+    printf("[DEBUG] %s scan: packet flags=0x%02x dst_port=%u -> %s:%u => %s\n",
+           (task->scan == SYN ? "SYN" : "TCP"),
+           flags,
+           dst_port,
+           target_ip,
+           ntohs(task->target.sin_port),
+           scan_result_to_str(r));
 	add_result(task->target.sin_addr.s_addr, ntohs(task->target.sin_port), task->scan, r);
 }
 
@@ -205,14 +216,22 @@ pcap_t *setup_pcap_handle(void) {
 		pcap_close(handle);
 		return NULL;
 	}
-	
+
+	// Set immediate mode to ensure packets are delivered as soon as they arrive
+	// if not set, we need to wait for the timeout to capture the packet
+	if (pcap_set_immediate_mode(handle, 1) != 0) {
+		fprintf(stderr, "Error setting immediate mode: %s\n", pcap_geterr(handle));
+		pcap_close(handle);
+		return NULL;
+	}
+
 	// Set timeout for packet capture
 	if (pcap_set_timeout(handle, INITIAL_RTT_TIMEOUT) != 0) {
 		fprintf(stderr, "Error setting timeout: %s\n", pcap_geterr(handle));
 		pcap_close(handle);
 		return NULL;
 	}
-	
+
 	// Activate the handle
 	if (pcap_activate(handle) != 0) {
 		fprintf(stderr, "Error activating pcap handle: %s\n", pcap_geterr(handle));
@@ -236,25 +255,27 @@ int setup_pcap_filter(pcap_t *handle, const struct task *task) {
 	char filter_exp[TCP_FILTER_SIZE] = {0}; // \0 terminated string
 	int ret;
 	
-	printf("FILTER EXP: Using TCP_FILTER_FORMAT macro\n");
-	ret = snprintf(filter_exp, TCP_FILTER_SIZE, TCP_FILTER_FORMAT,
-					task->source.sin_addr.s_addr & 0xff,
-					(task->source.sin_addr.s_addr >> 8) & 0xff,
-					(task->source.sin_addr.s_addr >> 16) & 0xff,
-					(task->source.sin_addr.s_addr >> 24) & 0xff,
-					task->target.sin_addr.s_addr & 0xff,
-					(task->target.sin_addr.s_addr >> 8) & 0xff,
-					(task->target.sin_addr.s_addr >> 16) & 0xff,
-					(task->target.sin_addr.s_addr >> 24) & 0xff,
-					ntohs(task->target.sin_port),
-					ntohs(ports.syn),
-					ntohs(ports.syn),
-					ntohs(task->target.sin_port));
+    uint32_t dst = task->source.sin_addr.s_addr; // us
+    uint32_t src = task->target.sin_addr.s_addr; // them
+    printf("FILTER EXP: Using TCP_FILTER_FORMAT macro\n");
+    ret = snprintf(filter_exp, TCP_FILTER_SIZE, TCP_FILTER_FORMAT,
+					(src) & 0xff,
+					(src >> 8) & 0xff,
+					(src >> 16) & 0xff,
+					(src >> 24) & 0xff,
+                    (dst) & 0xff,
+                    (dst >> 8) & 0xff,
+                    (dst >> 16) & 0xff,
+                    (dst >> 24) & 0xff,
+                    ntohs(task->target.sin_port),
+                    ntohs(ports.syn),
+                    ntohs(ports.syn),
+                    ntohs(task->target.sin_port));
 	if (ret >= TCP_FILTER_SIZE) {
 		fprintf(stderr, "Filter expression too long\n");
 		return -1;
 	}
-	printf("Generated filter: %s\n", filter_exp);
+    printf("Generated filter: %s\n", filter_exp);
 	if (pcap_compile(handle, &filter, filter_exp, 0, PCAP_NETMASK_UNKNOWN) == -1) {
 		fprintf(stderr, "Error compiling filter: %s\n", pcap_geterr(handle));
 		return -1;
@@ -280,8 +301,10 @@ int capture_packets(pcap_t *handle, struct task *task) {
 	int got_packet = 0;
 	
 	while (elapsed_ms < INITIAL_RTT_TIMEOUT) {
+		printf("Waiting for packet with timeout: %d milliseconds\n", elapsed_ms);
 		int result = pcap_next_ex(handle, &pkt_hdr, &pkt);
 		if (result == 1) {
+			printf("Received packet\n");
 			packet_handler((u_char*)task, pkt_hdr, pkt);
 			got_packet = 1;
 			break;
@@ -294,7 +317,13 @@ int capture_packets(pcap_t *handle, struct task *task) {
 	}
 	
 	if (!got_packet) {
-		printf("Timeout: No packet received within %d seconds\n", INITIAL_RTT_TIMEOUT / 1000);
+        char target_ip[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &task->target.sin_addr, target_ip, sizeof(target_ip));
+        printf("[DEBUG] Timeout waiting %dms for response -> %s:%u assumed %s\n",
+               INITIAL_RTT_TIMEOUT,
+               target_ip,
+               ntohs(task->target.sin_port),
+               scan_result_to_str(SR_FILTERED));
 		add_result(task->target.sin_addr.s_addr, ntohs(task->target.sin_port), task->scan, SR_FILTERED);
 	}
 	
@@ -340,10 +369,12 @@ void *thread_routine(void* arg) {
 
 int ft_nmap() {
 	pthread_t *threads = malloc(nmap.threads * sizeof(pthread_t));
+
 	if (threads == NULL) {
 		perror("threads = malloc()-> ");
 		return -1;
 	}
+	bzero(threads, nmap.threads * sizeof(pthread_t));
 
 	for (int i = 0; i < nmap.threads; i++) {
 		if (pthread_create(&threads[i], NULL, thread_routine, NULL) == -1) {
