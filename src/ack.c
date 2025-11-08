@@ -2,8 +2,10 @@
 #include <netinet/in.h>
 #include <pcap/pcap.h>
 #include <pcap/sll.h>
+#include <stdbool.h>
 #include <unistd.h>
-//#include <linux/ip.h>
+#include <time.h>
+#include <signal.h>
 
 #include <netinet/ip_icmp.h>
 #include <arpa/inet.h>
@@ -171,26 +173,43 @@ void	ack(pcap_t *handle, struct sockaddr_in src, struct sockaddr_in tgt)
 	struct iphdr		*iphdr;
 	struct bpf_program	fp;
 	int					ret;
+	timer_t				timerid;
+	struct itimerspec	curr_timer;
 
 	// could be in thread_routine and passed as a parameter
 	sll_hdr_size = pcap_datalink(handle) ==
 	               DLT_LINUX_SLL ? SLL_HDR_LEN : SLL2_HDR_LEN;
 	if (setup_pcap_tcp(handle, src, tgt, &fp))
 		return ;
-	if (send_probe(src, tgt, ACK))
+	if (create_timer(&timerid, handle))
 		return ;
-	ret = pcap_next_ex(handle, &pcap_hdr, &packet);
-	if (ret < 1)
+	do
 	{
-		fprintf(stderr, "ret: %d\n", ret);
+		if (send_probe(src, tgt, ACK))
+			return ;
+		ret = pcap_next_ex(handle, &pcap_hdr, &packet);
+		// if (ret == 0)
+		// 	fprintf(stdout, "0\n");
+		timer_gettime(timerid, &curr_timer);
+		if (curr_timer.it_value.tv_sec == 0 && curr_timer.it_value.tv_nsec == 0)
+			break;
+	}
+	while (ret == 0);
+	// fprintf(stdout, "out of loop. ret = %d\n", ret);
+	// IN THEORY, ret can only be 1, 0 or PCAP_ERROR in this situation
+	// LMAO it can be PCAP_ERROR_BREAK too ig
+	if (ret == PCAP_ERROR)
+	{
 		pcap_perror(handle, "pcap_next_ex");
 		return ;
 	}
+	else if (ret == 0 || ret == PCAP_ERROR_BREAK)
+		return ;
 	packet += sll_hdr_size;
 	// fprintf(stdout, "PACKET RECEIVED!\n");
 	if (pcap_hdr->caplen != pcap_hdr->len)
 		fprintf(stdout, "/!\\ LEN (%d) != CAPLEN (%d)\n", pcap_hdr->len, pcap_hdr->caplen);
-	fprintf(stdout, "PACKET (%p) / LEN (%d) / CAPLEN (%d)\n", packet, pcap_hdr->len, pcap_hdr->caplen);
+	// fprintf(stdout, "PACKET (%p) / LEN (%d) / CAPLEN (%d)\n", packet, pcap_hdr->len, pcap_hdr->caplen);
 	// fprintf(stdout, "PACKET is an error? %d\n", packet < 0);
 	iphdr = (struct iphdr *) packet;
 	// print_ip_packet(packet, iphdr->ihl * 4);

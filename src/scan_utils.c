@@ -1,8 +1,10 @@
 #include "ft_nmap.h"
+#include <bits/time.h>
 #include <netinet/tcp.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <signal.h>
 
 int	fill_tcp_filter(struct sockaddr_in src, struct sockaddr_in tgt, char *buff)
 {
@@ -131,3 +133,34 @@ int send_probe(struct sockaddr_in src, struct sockaddr_in tgt,
 	}
 	return (0);
 }
+
+// bool	check_timeout(struct timespec start, struct timespec end)
+// {
+// 	return (end->tv_sec - start->tv_sec) + (end->tv_nsec - start->tv_nsec) / 1e9;
+// }
+
+void	breakloop(union sigval arg)
+{
+	pcap_breakloop(arg.sival_ptr);
+}
+
+int	create_timer(timer_t *timerid, pcap_t *handle)
+{
+	struct sigevent	evp = {0};
+
+	evp.sigev_notify = SIGEV_THREAD;
+	evp.sigev_notify_function = &breakloop;
+	evp.sigev_value.sival_ptr = handle;
+	if (timer_create(CLOCK_MONOTONIC, &evp, timerid))
+	{
+		perror("Couldn't create timer");
+		return (1);
+	}
+	if (timer_settime(*timerid, 0, &default_delay, NULL))
+	{
+		perror("Couldn't arm timer");
+		return (1);
+	}
+	return (0);
+}
+

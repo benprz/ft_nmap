@@ -1,6 +1,7 @@
 #include <error.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <pcap/pcap.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <argp.h>
@@ -33,6 +34,12 @@ struct result	*results = NULL; // array
 size_t			nb_results = 0;
 pthread_mutex_t	task_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t	result_mutex = PTHREAD_MUTEX_INITIALIZER;
+const struct itimerspec	default_delay =
+{
+	.it_interval = { .tv_sec = 0, .tv_nsec = 0 },
+	.it_value = { .tv_sec = 1, .tv_nsec = 0 }
+};
+const struct itimerspec	empty_delay = {0};
 
 int parse_host(char *hostname)
 {

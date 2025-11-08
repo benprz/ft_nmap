@@ -1,6 +1,7 @@
 #ifndef FT_NMAP_H
 #define FT_NMAP_H
 
+#include <bits/types/struct_itimerspec.h>
 #include <limits.h>
 #include <stddef.h>
 #ifndef _GNU_SOURCE
@@ -13,6 +14,7 @@
 #include <netinet/in.h>
 #include <stdbool.h>
 #include <pcap/pcap.h>
+#include <time.h>
 
 #define UNUSED(x) (void)x
 #define TCP_FILTER_SIZE 450
@@ -26,7 +28,7 @@ enum	scan_type
 
 enum	scan_result
 {
-	OP, CL, FIL, UNFIL, OPFIL
+	SR_OPEN, SR_CLOSED, SR_FILTERED, SR_UNFILTERED, SR_OPEN_FILTERED
 };
 
 struct	nmap
@@ -71,14 +73,16 @@ struct	sockets
 	int	udp;
 };
 
-extern struct nmap		nmap;
-extern struct ports		ports;
-extern struct sockets	sockets;
-extern struct task		*tasks;
-extern struct result	*results;
-extern size_t			nb_results;
-extern pthread_mutex_t	task_mutex;
-extern pthread_mutex_t	result_mutex;
+extern struct nmap				nmap;
+extern struct ports				ports;
+extern struct sockets			sockets;
+extern struct task				*tasks;
+extern struct result			*results;
+extern size_t					nb_results;
+extern pthread_mutex_t			task_mutex;
+extern pthread_mutex_t			result_mutex;
+extern const struct itimerspec	default_delay;
+extern const struct itimerspec	empty_delay;
 
 int		ft_nmap(void);
 int		parse_options(int key, char *arg, struct argp_state *state);
@@ -97,6 +101,7 @@ int		fill_tcp_filter(struct sockaddr_in src, struct sockaddr_in tgt,
 						char *buff);
 int		send_probe(struct sockaddr_in src, struct sockaddr_in tgt,
 					enum scan_type scan);
+int		create_timer(timer_t *timerid, pcap_t *handle);
 
 // utils functions
 int todo(char*);
