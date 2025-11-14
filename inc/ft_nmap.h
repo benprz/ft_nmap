@@ -1,6 +1,7 @@
 #ifndef FT_NMAP_H
 #define FT_NMAP_H
 
+#include <bits/pthreadtypes.h>
 #include <bits/types/struct_itimerspec.h>
 #include <limits.h>
 #include <stddef.h>
@@ -17,9 +18,10 @@
 #include <time.h>
 
 #define UNUSED(x) (void)x
-#define TCP_FILTER_SIZE 450
+// les filtres TCP et UDP ont presque la même longueur (1 char de différence)
+#define FILTER_SIZE 451
 #define TCP_FILTER_FORMAT "ip src %u.%u.%u.%u && dst %u.%u.%u.%u && ((tcp && src port %u && dst port %u) || (icmp && icmp[icmptype] == 3 && (icmp[icmpcode] == 0 || icmp[icmpcode] == 1 || icmp[icmpcode] == 2 || icmp[icmpcode] == 3 || icmp[icmpcode] == 9 || icmp[icmpcode] == 10 || icmp[icmpcode] == 13) && (icmp[8] & 0xf0) == 0x40 && icmp[17] == 6 && icmp[8 + ((icmp[8] & 0xf) * 4):2] == %u && icmp[8 + ((icmp[8] & 0xf) * 4) + 2:2] == %u))"
-// #define TCP_FILTER_FORMAT "ip src %u.%u.%u.%u && dst %u.%u.%u.%u && ((tcp && src port %u && dst port %u) || (icmp && icmp[icmptype] == 3 && (icmp[icmpcode] == 0 || icmp[icmpcode] == 1 || icmp[icmpcode] == 2 || icmp[icmpcode] == 3 || icmp[icmpcode] == 9 || icmp[icmpcode] == 10 || icmp[icmpcode] == 13)))"
+#define UDP_FILTER_FORMAT "ip src %u.%u.%u.%u && dst %u.%u.%u.%u && ((udp && src port %u && dst port %u) || (icmp && icmp[icmptype] == 3 && (icmp[icmpcode] == 0 || icmp[icmpcode] == 1 || icmp[icmpcode] == 2 || icmp[icmpcode] == 3 || icmp[icmpcode] == 9 || icmp[icmpcode] == 10 || icmp[icmpcode] == 13) && (icmp[8] & 0xf0) == 0x40 && icmp[17] == 17 && icmp[8 + ((icmp[8] & 0xf) * 4):2] == %u && icmp[8 + ((icmp[8] & 0xf) * 4) + 2:2] == %u))"
 
 enum	scan_type
 {
@@ -73,6 +75,14 @@ struct	sockets
 	int	udp;
 };
 
+// handle in the struct is set to NULL right before being closed so
+// pcap_breakloop isn't called on a handle that's been closed
+struct	timer_data
+{
+	pcap_t			*handle;
+	pthread_mutex_t	handle_mutex;
+};
+
 extern struct nmap				nmap;
 extern struct ports				ports;
 extern struct sockets			sockets;
@@ -94,14 +104,8 @@ void	add_result(in_addr_t target, unsigned short port,  enum scan_type scan,
 					enum scan_result result);
 int		create_target_result(in_addr_t target);
 void	free_results(struct result *results);
-void	ack(pcap_t *handle, struct sockaddr_in src, struct sockaddr_in tgt);
-int		setup_pcap_tcp(pcap_t *handle, struct sockaddr_in src,
-						struct sockaddr_in tgt, struct bpf_program *fp);
-int		fill_tcp_filter(struct sockaddr_in src, struct sockaddr_in tgt,
-						char *buff);
-int		send_probe(struct sockaddr_in src, struct sockaddr_in tgt,
-					enum scan_type scan);
-int		create_timer(timer_t *timerid, pcap_t *handle);
+void	scan(pcap_t *handle, struct sockaddr_in src, struct sockaddr_in tgt,
+				enum scan_type scan, struct timer_data *timer_data);
 
 // utils functions
 int todo(char*);

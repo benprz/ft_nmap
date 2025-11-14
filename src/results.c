@@ -1,8 +1,9 @@
-#include "ft_nmap.h"
 #include <pthread.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "ft_nmap.h"
 
 void	free_results(struct result *results)
 {

@@ -1,5 +1,4 @@
-#include "ft_nmap.h"
-
+#include <pthread.h>
 #include <netinet/in.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -14,10 +13,11 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
-#include <pthread.h>
 #include <bits/pthreadtypes.h>
 #include <pcap/pcap.h>
 #include <pcap/sll.h>
+
+#include "ft_nmap.h"
 
 // Query routing table for source address and port
 int get_src_addr_and_port(const char *dest_ip, struct sockaddr_in *src_addr) {
@@ -126,12 +126,11 @@ int send_syn_packet(char *dest_ip, int dest_port)
 
 void *thread_routine(void* arg) {
 	UNUSED(arg);
-	pcap_t *handle;
-	char	errbuf[PCAP_ERRBUF_SIZE];
-	int		ret;
+	pcap_t				*handle;
+	char				errbuf[PCAP_ERRBUF_SIZE];
+	int					ret;
+	struct timer_data	timer_data = { .handle_mutex = PTHREAD_MUTEX_INITIALIZER };
 
-	// pcap_create ?
-	// handle = pcap_open_live(NULL, BUFSIZ, 0, 1000, errbuf);
 	handle = pcap_create(NULL, errbuf);
 	if (!handle)
 	{
@@ -148,20 +147,21 @@ void *thread_routine(void* arg) {
 		pcap_close(handle);
 		return (NULL);
 	}
+	timer_data.handle = handle;
 	while (1) {
 		pthread_mutex_lock(&task_mutex);
 		if (tasks) {
 			struct task *task = tasks;
 			tasks = tasks->next;
 			pthread_mutex_unlock(&task_mutex);
-			// printf("Processing task: %s %d %d\n", inet_ntoa(task->target.sin_addr), ntohs(task->target.sin_port), task->scan);
-			if (task->scan == ACK)
-				ack(handle, task->source, task->target);
-			// print_task(*task);
+			scan(handle, task->source, task->target, task->scan, &timer_data);
 			free(task);
 		} else {
-			pcap_close(handle);
 			pthread_mutex_unlock(&task_mutex);
+			pthread_mutex_lock(&timer_data.handle_mutex);
+			pcap_close(handle);
+			timer_data.handle = NULL;
+			pthread_mutex_unlock(&timer_data.handle_mutex);
 			return NULL;
 		}
 	}

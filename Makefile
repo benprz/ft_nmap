@@ -15,7 +15,7 @@ SRC =	main.c \
 		sockets.c \
 		tasks.c \
 		results.c \
-		ack.c \
+		scan.c \
 		scan_utils.c \
 		utils.c
 
