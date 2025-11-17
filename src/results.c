@@ -43,6 +43,7 @@ error:
 	return (1);
 }
 
+// port doit être en hbo mais pas target
 void	add_result(in_addr_t target, unsigned short port,  enum scan_type scan,
 					enum scan_result result)
 {

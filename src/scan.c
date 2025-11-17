@@ -3,6 +3,7 @@
 #include <pcap/sll.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
+#include <netinet/ip_icmp.h>
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
@@ -203,6 +204,57 @@ int	setup_pcap(pcap_t *handle, enum scan_type scan,  struct sockaddr_in src,
 	return (0);
 }
 
+enum scan_result	interpret_tcp(const u_char *packet, enum scan_type scan)
+{
+	struct tcphdr	*tcphdr;
+
+	tcphdr = (struct tcphdr *) packet;
+	if (tcphdr->syn || tcphdr->ack)
+		return (result_lookup[scan][PR_TCP_SYNACK]);
+	else
+		return (result_lookup[scan][PR_TCP_RST]);
+}
+
+enum scan_result	interpret_icmp(const u_char *packet, enum scan_type scan)
+{
+	struct icmphdr	*icmphdr;
+
+	icmphdr = (struct icmphdr *) packet;
+	if (icmphdr->type == 3 && icmphdr->code == 3)
+		return (result_lookup[scan][PR_ICMP_3_3]);
+	// je check pas si c'est un 3:1,2,9,10,13 mais on peut surement partir du
+	// principe que c'en est un non?
+	else
+		return (result_lookup[scan][PR_ICMP_OTHER]);
+}
+
+enum scan_result	interpret_packet(const u_char *packet, enum scan_type scan)
+{
+	struct iphdr	*iphdr;
+
+	if (!packet)
+		return (result_lookup[scan][PR_NONE]);
+	iphdr = (struct iphdr *) packet;
+	if (iphdr->protocol == IPPROTO_TCP)
+	{
+		packet += iphdr->ihl * 4;
+		return (interpret_tcp(packet, scan));
+	}
+	else if (iphdr->protocol == IPPROTO_ICMP)
+	{
+		packet += iphdr->ihl * 4;
+		return (interpret_icmp(packet, scan));
+	}
+	else if (iphdr->protocol == IPPROTO_UDP)
+		return (result_lookup[scan][PR_UDP]);
+	// shouldn't happen
+	else
+	{
+		fprintf(stdout, "wtf none?? shouldn't have happened\n");
+		return (result_lookup[scan][PR_NONE]);
+	}
+}
+
 // timer_data contains the handle too but it felt weird to remove the argument
 // 'handle' as timer_data is only needed for the timer breakloop function
 void	scan(pcap_t *handle, struct sockaddr_in src, struct sockaddr_in tgt,
@@ -211,10 +263,10 @@ void	scan(pcap_t *handle, struct sockaddr_in src, struct sockaddr_in tgt,
 	size_t				sll_hdr_size;
 	const u_char		*packet;
 	struct pcap_pkthdr	*pcap_hdr;
-	struct iphdr		*iphdr;
 	int					ret;
 	timer_t				timerid;
 	struct itimerspec	curr_timer;
+	enum scan_result	result;
 
 	// could be in thread_routine and passed as a parameter
 	sll_hdr_size = pcap_datalink(handle) ==
@@ -244,7 +296,6 @@ void	scan(pcap_t *handle, struct sockaddr_in src, struct sockaddr_in tgt,
 		perror("Couldn't disable timer");
 		return ;
 	}
-	// fprintf(stdout, "out of loop. ret = %d\n", ret);
 	// IN THEORY, ret can only be 1, 0 or PCAP_ERROR in this situation
 	// LMAO it can be PCAP_ERROR_BREAK too ig
 	if (ret == PCAP_ERROR)
@@ -253,27 +304,18 @@ void	scan(pcap_t *handle, struct sockaddr_in src, struct sockaddr_in tgt,
 		return ;
 	}
 	else if (ret == 0 || ret == PCAP_ERROR_BREAK)
-		return ;
-	packet += sll_hdr_size;
-	// fprintf(stdout, "PACKET RECEIVED!\n");
-	// il faudra virer ça à la fin
-	if (pcap_hdr->caplen != pcap_hdr->len)
-		fprintf(stdout, "/!\\ LEN (%d) != CAPLEN (%d)\n", pcap_hdr->len, pcap_hdr->caplen);
-	// fprintf(stdout, "PACKET (%p) / LEN (%d) / CAPLEN (%d)\n", packet, pcap_hdr->len, pcap_hdr->caplen);
-	// fprintf(stdout, "PACKET is an error? %d\n", packet < 0);
-	iphdr = (struct iphdr *) packet;
-	// print_ip_packet(packet, iphdr->ihl * 4);
-	if (iphdr->protocol == IPPROTO_TCP)
-	{
-		packet += iphdr->ihl * 4;
-		fprintf(stdout, "paquet TCP reçu\n");
-		// print_tcp_packet(packet, pcap_hdr->caplen - sll_hdr_size - iphdr->ihl * 4);
-	}
-	else if (iphdr->protocol == IPPROTO_ICMP)
-		fprintf(stdout, "paquet ICMP reçu\n");
-	else if (iphdr->protocol == IPPROTO_UDP)
-		fprintf(stdout, "paquet UDP reçu\n");
+		result = interpret_packet(NULL, scan);
 	else
-		fprintf(stdout, "paquet %d reçu: wtf\n", iphdr->protocol);
+	{
+		packet += sll_hdr_size;
+		// virer ça à la fin ?
+		if (pcap_hdr->caplen != pcap_hdr->len)
+		{
+			fprintf(stderr, "/!\\ LEN (%d) != CAPLEN (%d)\n", pcap_hdr->len, pcap_hdr->caplen);
+			return ;
+		}
+		result = interpret_packet(packet, scan);
+	}
+	add_result(tgt.sin_addr.s_addr, ntohs(tgt.sin_port), scan, result);
 }
 
