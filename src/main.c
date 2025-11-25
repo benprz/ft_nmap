@@ -37,7 +37,7 @@ pthread_mutex_t	result_mutex = PTHREAD_MUTEX_INITIALIZER;
 const struct itimerspec	default_delay =
 {
 	.it_interval = { .tv_sec = 0, .tv_nsec = 0 },
-	.it_value = { .tv_sec = 1, .tv_nsec = 0 }
+	.it_value = { .tv_sec = INITIAL_RTT_TIMEOUT, .tv_nsec = 0 }
 };
 const struct itimerspec	empty_delay = {0};
 // for impossible replies (not in the official nmap response lookup table) I

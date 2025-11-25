@@ -48,7 +48,7 @@ int get_src_addr_and_port(const char *dest_ip, struct sockaddr_in *src_addr) {
     close(sockfd);
     return 0;
 }
-
+/*
 uint16_t	checksum_for_tcp_header(struct tcphdr tcphdr, struct sockaddr_in local_addr, struct sockaddr_in dest_addr)
 {
 	size_t			i;
@@ -360,7 +360,7 @@ int capture_packets(pcap_t *handle, struct task *task) {
 	
 	return got_packet;
 }
-
+*/
 void *thread_routine(void* arg) {
 	UNUSED(arg);
 	pcap_t				*handle;

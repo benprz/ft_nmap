@@ -20,7 +20,7 @@
 #define UNUSED(x) (void)x
 // les filtres TCP et UDP ont presque la même longueur (1 char de différence)
 #define FILTER_SIZE 451
-#define TCP_FILTER_FORMAT "ip src %u.%u.%u.%u && dst %u.%u.%u.%u && ((tcp && src port %u && dst port %u) || (icmp && icmp[icmptype] == 3 && (icmp[icmpcode] == 0 || icmp[icmpcode] == 1 || icmp[icmpcode] == 2 || icmp[icmpcode] == 3 || icmp[icmpcode] == 9 || icmp[icmpcode] == 10 || icmp[icmpcode] == 13) && (icmp[8] & 0xf0) == 0x40 && icmp[17] == 6 && icmp[8 + ((icmp[8] & 0xf) * 4):2] == %u && icmp[8 + ((icmp[8] & 0xf) * 4) + 2:2] == %u))"
+// #define TCP_FILTER_FORMAT "ip src %u.%u.%u.%u && dst %u.%u.%u.%u && ((tcp && src port %u && dst port %u) || (icmp && icmp[icmptype] == 3 && (icmp[icmpcode] == 0 || icmp[icmpcode] == 1 || icmp[icmpcode] == 2 || icmp[icmpcode] == 3 || icmp[icmpcode] == 9 || icmp[icmpcode] == 10 || icmp[icmpcode] == 13) && (icmp[8] & 0xf0) == 0x40 && icmp[17] == 6 && icmp[8 + ((icmp[8] & 0xf) * 4):2] == %u && icmp[8 + ((icmp[8] & 0xf) * 4) + 2:2] == %u))"
 #define UDP_FILTER_FORMAT "ip src %u.%u.%u.%u && dst %u.%u.%u.%u && ((udp && src port %u && dst port %u) || (icmp && icmp[icmptype] == 3 && (icmp[icmpcode] == 0 || icmp[icmpcode] == 1 || icmp[icmpcode] == 2 || icmp[icmpcode] == 3 || icmp[icmpcode] == 9 || icmp[icmpcode] == 10 || icmp[icmpcode] == 13) && (icmp[8] & 0xf0) == 0x40 && icmp[17] == 17 && icmp[8 + ((icmp[8] & 0xf) * 4):2] == %u && icmp[8 + ((icmp[8] & 0xf) * 4) + 2:2] == %u))"
 
 // ALL est à -1 parce que les vrais scans commencent à SYN, comme ça pour
@@ -32,7 +32,7 @@ enum	scan_type
 
 enum	scan_result
 {
-	SR_OPEN, SR_CLOSED, SR_FILTERED, SR_UNFILTERED, SR_OPEN_FILTERED
+	SR_OPEN = 0, SR_CLOSED, SR_FILTERED, SR_UNFILTERED, SR_OPEN_FILTERED
 };
 
 // toutes les réponses possibles à une probe
@@ -43,7 +43,7 @@ enum	probe_response
 
 // 1 second, which is the default timeout for nmap, you can check it with -Pn option
 // -Pn option means that the scan will be performed without pinging the target, so no timeout measurement is done (which helps to speed up the scan)
-#define INITIAL_RTT_TIMEOUT 1000 
+#define INITIAL_RTT_TIMEOUT 1 
 
 // BPF filter for capturing relevant packets for port TCP/SYN scan result
 // https://nmap.org/book/synscan.html
@@ -77,7 +77,6 @@ enum	probe_response
 			"icmp[8 + ((icmp[8] & 0xf) * 4) + 2:2] == %u" \
 		")" \
 	")"
-#define TCP_FILTER_SIZE 432
 
 struct	nmap
 {
