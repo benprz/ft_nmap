@@ -1,6 +1,7 @@
 #include <error.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <pcap/pcap.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <argp.h>
@@ -33,6 +34,24 @@ struct result	*results = NULL; // array
 size_t			nb_results = 0;
 pthread_mutex_t	task_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t	result_mutex = PTHREAD_MUTEX_INITIALIZER;
+const struct itimerspec	default_delay =
+{
+	.it_interval = { .tv_sec = 0, .tv_nsec = 0 },
+	.it_value = { .tv_sec = 1, .tv_nsec = 0 }
+};
+const struct itimerspec	empty_delay = {0};
+// for impossible replies (not in the official nmap response lookup table) I
+// put open most of the time but they shouldn't occur anyway so it dones't matter
+// (maybe we should put the same replay as PR_NONE)
+const int		result_lookup[6][6] =
+{
+	{SR_OPEN, SR_CLOSED, SR_OPEN, SR_FILTERED, SR_FILTERED, SR_FILTERED }, // SYN
+	{SR_OPEN, SR_CLOSED, SR_OPEN, SR_FILTERED, SR_FILTERED, SR_OPEN_FILTERED}, // NULL
+	{SR_OPEN, SR_UNFILTERED, SR_OPEN, SR_FILTERED, SR_FILTERED, SR_FILTERED }, // ACK
+	{SR_OPEN, SR_CLOSED, SR_OPEN, SR_FILTERED, SR_FILTERED, SR_OPEN_FILTERED}, // FIN
+	{SR_OPEN, SR_CLOSED, SR_OPEN, SR_FILTERED, SR_FILTERED, SR_OPEN_FILTERED}, // XMAS
+	{SR_OPEN, SR_CLOSED, SR_OPEN, SR_CLOSED, SR_FILTERED, SR_OPEN_FILTERED}, // UDP
+};
 
 int parse_host(char *hostname)
 {

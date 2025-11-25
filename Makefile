@@ -15,6 +15,8 @@ SRC =	main.c \
 		sockets.c \
 		tasks.c \
 		results.c \
+		scan.c \
+		scan_utils.c \
 		utils.c
 
 OBJ_DIR = .obj/

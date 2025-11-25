@@ -1,6 +1,6 @@
-#include "ft_nmap.h"
-
+#include <pthread.h>
 #include <netinet/in.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -13,10 +13,41 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
-#include <pthread.h>
 #include <bits/pthreadtypes.h>
 #include <pcap/pcap.h>
-#include <sys/select.h>
+#include <pcap/sll.h>
+
+#include "ft_nmap.h"
+
+// Query routing table for source address and port
+int get_src_addr_and_port(const char *dest_ip, struct sockaddr_in *src_addr) {
+    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        perror("Socket error");
+        return -1;
+    }
+
+    struct sockaddr_in dest_addr = {0};
+    dest_addr.sin_family = AF_INET;
+    dest_addr.sin_addr.s_addr = inet_addr(dest_ip);
+    dest_addr.sin_port = htons(9999); // Arbitrary port for routing query
+
+    if (connect(sockfd, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) < 0) {
+        perror("Connect error");
+        close(sockfd);
+        return -1;
+    }
+
+    socklen_t src_addr_len = sizeof(struct sockaddr_in);
+    if (getsockname(sockfd, (struct sockaddr *)src_addr, &src_addr_len) < 0) {
+        perror("Getsockname error");
+        close(sockfd);
+        return -1;
+    }
+
+    close(sockfd);
+    return 0;
+}
 
 uint16_t	checksum_for_tcp_header(struct tcphdr tcphdr, struct sockaddr_in local_addr, struct sockaddr_in dest_addr)
 {
@@ -332,36 +363,42 @@ int capture_packets(pcap_t *handle, struct task *task) {
 
 void *thread_routine(void* arg) {
 	UNUSED(arg);
+	pcap_t				*handle;
+	char				errbuf[PCAP_ERRBUF_SIZE];
+	int					ret;
+	struct timer_data	timer_data = { .handle_mutex = PTHREAD_MUTEX_INITIALIZER };
+
+	handle = pcap_create(NULL, errbuf);
+	if (!handle)
+	{
+		fprintf(stderr, "Couldn't open devices: %s\n", errbuf);
+		return (NULL);
+	}
+	pcap_set_snaplen(handle, 65535);
+	pcap_set_buffer_size(handle, 1024 * 1024);
+	pcap_set_immediate_mode(handle, true);
+	ret = pcap_activate(handle);
+	if (ret)
+	{
+		pcap_perror(handle, "pcap_activate");
+		pcap_close(handle);
+		return (NULL);
+	}
+	timer_data.handle = handle;
 	while (1) {
 		pthread_mutex_lock(&task_mutex);
 		if (tasks) {
 			struct task *task = tasks;
 			tasks = tasks->next;
 			pthread_mutex_unlock(&task_mutex);
-			
-			printf("Processing task: %s %d %d\n", inet_ntoa(task->target.sin_addr), ntohs(task->target.sin_port), task->scan);
-			
-			// Setup pcap handle
-			pcap_t *handle = setup_pcap_handle();
-			if (handle == NULL) {
-				free(task);
-				continue;
-			}
-			
-			// Setup pcap filter
-			if (setup_pcap_filter(handle, task) < 0) {
-				pcap_close(handle);
-				free(task);
-				continue;
-			}
-			
-			// Capture packets and send SYN
-			capture_packets(handle, task);
-			
-			pcap_close(handle);
+			scan(handle, task->source, task->target, task->scan, &timer_data);
 			free(task);
 		} else {
 			pthread_mutex_unlock(&task_mutex);
+			pthread_mutex_lock(&timer_data.handle_mutex);
+			pcap_close(handle);
+			timer_data.handle = NULL;
+			pthread_mutex_unlock(&timer_data.handle_mutex);
 			return NULL;
 		}
 	}

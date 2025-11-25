@@ -1,6 +1,8 @@
 #ifndef FT_NMAP_H
 #define FT_NMAP_H
 
+#include <bits/pthreadtypes.h>
+#include <bits/types/struct_itimerspec.h>
 #include <limits.h>
 #include <stddef.h>
 #ifndef _GNU_SOURCE
@@ -12,17 +14,31 @@
 #include <argp.h>
 #include <netinet/in.h>
 #include <stdbool.h>
+#include <pcap/pcap.h>
+#include <time.h>
 
 #define UNUSED(x) (void)x
+// les filtres TCP et UDP ont presque la même longueur (1 char de différence)
+#define FILTER_SIZE 451
+#define TCP_FILTER_FORMAT "ip src %u.%u.%u.%u && dst %u.%u.%u.%u && ((tcp && src port %u && dst port %u) || (icmp && icmp[icmptype] == 3 && (icmp[icmpcode] == 0 || icmp[icmpcode] == 1 || icmp[icmpcode] == 2 || icmp[icmpcode] == 3 || icmp[icmpcode] == 9 || icmp[icmpcode] == 10 || icmp[icmpcode] == 13) && (icmp[8] & 0xf0) == 0x40 && icmp[17] == 6 && icmp[8 + ((icmp[8] & 0xf) * 4):2] == %u && icmp[8 + ((icmp[8] & 0xf) * 4) + 2:2] == %u))"
+#define UDP_FILTER_FORMAT "ip src %u.%u.%u.%u && dst %u.%u.%u.%u && ((udp && src port %u && dst port %u) || (icmp && icmp[icmptype] == 3 && (icmp[icmpcode] == 0 || icmp[icmpcode] == 1 || icmp[icmpcode] == 2 || icmp[icmpcode] == 3 || icmp[icmpcode] == 9 || icmp[icmpcode] == 10 || icmp[icmpcode] == 13) && (icmp[8] & 0xf0) == 0x40 && icmp[17] == 17 && icmp[8 + ((icmp[8] & 0xf) * 4):2] == %u && icmp[8 + ((icmp[8] & 0xf) * 4) + 2:2] == %u))"
 
+// ALL est à -1 parce que les vrais scans commencent à SYN, comme ça pour
+// le tableau de résultat tu peux utiliser scan_type comme indice du tableau
 enum	scan_type
 {
-	ALL, SYN, NUL, ACK, FIN, XMAS, UDP
+	ALL = -1, SYN = 0, NUL = 1, ACK = 2, FIN = 3, XMAS = 4, UDP = 5
 };
 
 enum	scan_result
 {
 	SR_OPEN, SR_CLOSED, SR_FILTERED, SR_UNFILTERED, SR_OPEN_FILTERED
+};
+
+// toutes les réponses possibles à une probe
+enum	probe_response
+{
+	PR_TCP_SYNACK = 0, PR_TCP_RST, PR_UDP, PR_ICMP_3_3, PR_ICMP_OTHER, PR_NONE
 };
 
 // 1 second, which is the default timeout for nmap, you can check it with -Pn option
@@ -105,14 +121,26 @@ struct	sockets
 	int	udp;
 };
 
-extern struct nmap		nmap;
-extern struct ports		ports;
-extern struct sockets	sockets;
-extern struct task		*tasks;
-extern struct result	*results;
-extern size_t			nb_results;
-extern pthread_mutex_t	task_mutex;
-extern pthread_mutex_t	result_mutex;
+// handle in the struct is set to NULL right before being closed so
+// pcap_breakloop isn't called on a handle that's been closed
+struct	timer_data
+{
+	pcap_t			*handle;
+	pthread_mutex_t	handle_mutex;
+};
+
+extern struct nmap				nmap;
+extern struct ports				ports;
+extern struct sockets			sockets;
+extern struct task				*tasks;
+extern struct result			*results;
+extern size_t					nb_results;
+extern pthread_mutex_t			task_mutex;
+extern pthread_mutex_t			result_mutex;
+extern const struct itimerspec	default_delay;
+extern const struct itimerspec	empty_delay;
+// usage: result_lookup[scan_type][probe_response] gives you a scan_result
+extern const int				result_lookup[6][6];
 
 int		ft_nmap(void);
 int		parse_options(int key, char *arg, struct argp_state *state);
@@ -124,6 +152,8 @@ void	add_result(in_addr_t target, unsigned short port,  enum scan_type scan,
 					enum scan_result result);
 int		create_target_result(in_addr_t target);
 void	free_results(struct result *results);
+void	scan(pcap_t *handle, struct sockaddr_in src, struct sockaddr_in tgt,
+				enum scan_type scan, struct timer_data *timer_data);
 void	print_results(void);
 
 // utils functions
