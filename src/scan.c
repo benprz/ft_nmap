@@ -209,10 +209,10 @@ enum scan_result	interpret_tcp(const u_char *packet, enum scan_type scan)
 	struct tcphdr	*tcphdr;
 
 	tcphdr = (struct tcphdr *) packet;
-	if (tcphdr->syn || tcphdr->ack)
-		return (result_lookup[scan][PR_TCP_SYNACK]);
-	else
+	if (tcphdr->rst)
 		return (result_lookup[scan][PR_TCP_RST]);
+	else
+		return (result_lookup[scan][PR_TCP_SYNACK]);
 }
 
 enum scan_result	interpret_icmp(const u_char *packet, enum scan_type scan)
