@@ -74,24 +74,63 @@ const char *scan_result_to_str(enum scan_result r)
     }
 }
 
-void	print_results(void)
-{
-    for (size_t ri = 0; ri < nb_results; ri++)
-    {
-        struct in_addr addr;
-        addr.s_addr = results[ri].target;
-        printf("Results for %s:\n", inet_ntoa(addr));
 
-        size_t nb_ports = (size_t)(nmap.port_end - nmap.port_start + 1);
-        for (size_t p = 0; p < nb_ports; p++)
+void    print_results(void)
+{
+        size_t                  ri;
+        struct in_addr  addr;
+        size_t                  nb_ports;
+        size_t                  p;
+        unsigned short  port;
+        uint32_t                value;
+        enum scan_result        result;
+
+        ri = 0;
+        while (ri < nb_results)
         {
-            unsigned short port = (unsigned short)(nmap.port_start + p);
-            uint32_t value = results[ri].results[p];
-            enum scan_result syn_res = (enum scan_result)((value >> (SYN * 3)) & 0x7);
-            if (nmap.scan == SYN || nmap.scan == ALL)
-            {
-                printf("  %u/tcp (SYN): %s\n", port, scan_result_to_str(syn_res));
-            }
+                addr.s_addr = results[ri].target;
+                printf("target: %s\n", inet_ntoa(addr));
+                nb_ports = (size_t)(nmap.port_end - nmap.port_start + 1);
+                p = 0;
+                while (p < nb_ports)
+                {
+                        port = (unsigned short)(nmap.port_start + p);
+                        value = results[ri].results[p];
+                        printf("  port %u:\n", port);
+                        if (nmap.scan == SYN || nmap.scan == ALL)
+                        {
+                                result = (enum scan_result)((value >> (SYN * 3)) & 0x7);
+                                printf("    SYN: %s\n", scan_result_to_str(result));
+                        }
+                        if (nmap.scan == NUL || nmap.scan == ALL)
+                        {
+                                result = (enum scan_result)((value >> (NUL * 3)) & 0x7);
+                                printf("    NUL: %s\n", scan_result_to_str(result));
+                        }
+                        if (nmap.scan == ACK || nmap.scan == ALL)
+                        {
+                                result = (enum scan_result)((value >> (ACK * 3)) & 0x7);
+                                printf("    ACK: %s\n", scan_result_to_str(result));
+                        }
+                        if (nmap.scan == FIN || nmap.scan == ALL)
+                        {
+                                result = (enum scan_result)((value >> (FIN * 3)) & 0x7);
+                                printf("    FIN: %s\n", scan_result_to_str(result));
+                        }
+                        if (nmap.scan == XMAS || nmap.scan == ALL)
+                        {
+                                result = (enum scan_result)((value >> (XMAS * 3)) & 0x7);
+                                printf("    XMAS: %s\n", scan_result_to_str(result));
+                        }
+                        if (nmap.scan == UDP || nmap.scan == ALL)
+                        {
+                                result = (enum scan_result)((value >> (UDP * 3)) & 0x7);
+                                printf("    UDP: %s\n", scan_result_to_str(result));
+                        }
+                        p++;
+                }
+                ri++;
         }
-    }
 }
+
+
