@@ -100,6 +100,6 @@ int main(int argc, char **argv)
 		free(tasks);
 		return (2);
 	}
-	print_results();
+	print_results_debug();
 	return (0);
 }

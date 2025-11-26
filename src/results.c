@@ -75,7 +75,7 @@ const char *scan_result_to_str(enum scan_result r)
 }
 
 
-void    print_results(void)
+void    print_results_debug(void)
 {
         size_t                  ri;
         struct in_addr  addr;

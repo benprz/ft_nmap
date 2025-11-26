@@ -153,7 +153,7 @@ int		create_target_result(in_addr_t target);
 void	free_results(struct result *results);
 void	scan(pcap_t *handle, struct sockaddr_in src, struct sockaddr_in tgt,
 				enum scan_type scan, struct timer_data *timer_data);
-void	print_results(void);
+
 
 // utils functions
 int todo(char*);
@@ -163,5 +163,6 @@ void    print_args(struct nmap args);
 char	*trim_whitespaces(char *str);
 void	print_task(struct task task);
 const char *scan_result_to_str(enum scan_result r);
+void	print_results_debug(void);
 
 #endif
