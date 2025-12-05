@@ -81,12 +81,13 @@ int main(int argc, char **argv)
 		{"ports", 'p', "PORT/RANGE", 0, "target ports(s) to scan (single port or range with format (n-m) (max number of ports: 1024)", 0},
 		{"threads", 'm', "THREADS", 0, "maximum number of threads to use for the scan (default: 10) (max: 250)", 0},
 		{"scan", 's', "TYPE", 0, "type of scan to use, must be one of SYN, NULL, ACK, FIN, XMAS, UDP (all used if not specified)", 0},
+		{"spoof", 'S', "ADDRESS", 0, "Source IP address to use", 0},
 		{0}
 	};
 
 	struct argp argp = {options, parse_options, args_doc, doc, 0, 0, 0};
 	argp_parse(&argp, argc, argv, 0, 0, 0);
-	// print_args(nmap);
+	print_args(nmap);
 	if (getuid() != 0)
 	{
 	    fprintf(stderr, "You must be root to use ft_nmap\n");

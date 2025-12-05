@@ -1,12 +1,15 @@
 #include "ft_nmap.h"
 
 #include <argp.h>
+#include <netinet/in.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 
 void	print_args(struct nmap args)
 {
+	char	buff[INET_ADDRSTRLEN];
+
 	fprintf(stdout, "scan: %d\n", args.scan);
 	fprintf(stdout, "threads: %d\n", args.threads);
 	fprintf(stdout, "port start: %d\n", args.port_start);
@@ -14,6 +17,10 @@ void	print_args(struct nmap args)
 	fprintf(stdout, "target opt: %s\n", args.target_opt);
 	fprintf(stdout, "target file name: %s\n", args.target_file);
 	fprintf(stdout, "target arg: %s\n", args.target_arg);
+	if (!inet_ntop(AF_INET, &args.spoofed_source, buff, INET_ADDRSTRLEN))
+		perror("inet_ntop");
+	else
+		fprintf(stdout, "spoofed source: %s\n", buff);
 }
 
 int parse_scan(char *str)
@@ -85,6 +92,10 @@ int parse_options(int key, char *arg, struct argp_state *state)
 		case 's':
 			if (parse_scan(arg))
 				argp_error(state, "bad scan type");
+			break;
+		case 'S':
+			if (inet_pton(AF_INET, arg, &nmap.spoofed_source) != 1)
+				argp_error(state, "invalid address");
 			break;
 		case 'm':
 			nmap.threads = atoi(arg);
