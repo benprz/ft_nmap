@@ -25,7 +25,7 @@ struct nmap nmap = {
 	NULL, // target_opt (-t argument)
 	NULL, // target_file (-t argument)
 	NULL, // target_arg (non option argument)
-	{0}
+	{0} // spoofed source
 };
 
 struct ports	ports;
