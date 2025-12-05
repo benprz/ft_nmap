@@ -87,7 +87,7 @@ int main(int argc, char **argv)
 
 	struct argp argp = {options, parse_options, args_doc, doc, 0, 0, 0};
 	argp_parse(&argp, argc, argv, 0, 0, 0);
-	print_args(nmap);
+	// print_args(nmap);
 	if (getuid() != 0)
 	{
 	    fprintf(stderr, "You must be root to use ft_nmap\n");
