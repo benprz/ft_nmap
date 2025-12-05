@@ -80,13 +80,14 @@ enum	probe_response
 
 struct	nmap
 {
-	enum scan_type	scan; // type of scan to use
-	uint16_t		threads; // number of threads
-	uint16_t		port_start;
-	uint16_t		port_end;
-	char			*target_opt; // argument of -t
-	char			*target_file; // argument of -f
-	char			*target_arg; // non option argument
+	enum scan_type		scan; // type of scan to use
+	uint16_t			threads; // number of threads
+	uint16_t			port_start;
+	uint16_t			port_end;
+	char				*target_opt; // argument of -t
+	char				*target_file; // argument of -f
+	char				*target_arg; // non option argument
+	struct sockaddr_in	spoofed_source;
 };
 
 struct	task

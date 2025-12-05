@@ -24,7 +24,8 @@ struct nmap nmap = {
 	1024, // port end
 	NULL, // target_opt (-t argument)
 	NULL, // target_file (-t argument)
-	NULL // target_arg (non option argument)
+	NULL, // target_arg (non option argument)
+	{0}
 };
 
 struct ports	ports;
@@ -70,7 +71,6 @@ int parse_host(char *hostname)
 	}
 	return 0;
 }
-
 
 // lpcap 1.8.0 minimum version (see pcap_compile man page)
 int main(int argc, char **argv)
