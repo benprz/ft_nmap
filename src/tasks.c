@@ -152,6 +152,11 @@ int	get_src_sockaddr(int sock, const struct sockaddr_in *tgt, struct sockaddr_in
 	struct sockaddr_in	disconnect;
 	socklen_t	len;
 
+	if (nmap.spoofed_source.sin_family == AF_INET)
+	{
+		*src = nmap.spoofed_source;
+		return (0);
+	}
 	if (connect(sock, (struct sockaddr *) tgt, sizeof(struct sockaddr_in)))
 	{
 		perror("Couldn't connect UDP socket");

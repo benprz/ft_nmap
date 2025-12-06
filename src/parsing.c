@@ -17,10 +17,13 @@ void	print_args(struct nmap args)
 	fprintf(stdout, "target opt: %s\n", args.target_opt);
 	fprintf(stdout, "target file name: %s\n", args.target_file);
 	fprintf(stdout, "target arg: %s\n", args.target_arg);
-	if (!inet_ntop(AF_INET, &args.spoofed_source, buff, INET_ADDRSTRLEN))
+	if (!inet_ntop(AF_INET, &args.spoofed_source.sin_addr, buff, INET_ADDRSTRLEN))
 		perror("inet_ntop");
 	else
+	{
 		fprintf(stdout, "spoofed source: %s\n", buff);
+		fprintf(stdout, "src sin_family: %d\n", args.spoofed_source.sin_family);
+	}
 }
 
 int parse_scan(char *str)
@@ -94,8 +97,10 @@ int parse_options(int key, char *arg, struct argp_state *state)
 				argp_error(state, "bad scan type");
 			break;
 		case 'S':
-			if (inet_pton(AF_INET, arg, &nmap.spoofed_source) != 1)
-				argp_error(state, "invalid address");
+			if (inet_pton(AF_INET, arg, &nmap.spoofed_source.sin_addr) != 1)
+				argp_error(state, "invalid spoofing address");
+			else
+				nmap.spoofed_source.sin_family = AF_INET;
 			break;
 		case 'm':
 			nmap.threads = atoi(arg);
