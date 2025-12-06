@@ -57,7 +57,6 @@ int	create_udp_socket(struct sockaddr_in addr, unsigned short int *port_adr)
 		perror("Couldn't get port");
 		return (1);
 	}
-	sockets.udp = sock;
 	*port_adr = local.sin_port;
 	return (0);
 }
@@ -82,20 +81,11 @@ int create_recv_sockets(void)
 
 int create_send_sockets(void)
 {
-	sockets.tcp = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
-	if (sockets.tcp == -1)
+	send_sock = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
+	if (send_sock == -1)
 	{
 		perror("Couldn't create send socket");
 		return (1);
 	}
-	// /!\ il faut le même port pour envoyer et recevoir donc on utilise
-	// le socket créé pour la réception des paquets udp
-	// 
-	// sockets.udp = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	// if (sockets.udp == -1)
-	// {
-	// 	perror("Couldn't create send socket");
-	// 	return (1);
-	// }
 	return (0);
 }

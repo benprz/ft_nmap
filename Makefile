@@ -16,6 +16,8 @@ SRC =	main.c \
 		tasks.c \
 		results.c \
 		scan.c \
+		scan_send_probe.c \
+		scan_interpret_response.c \
 		scan_utils.c \
 		utils.c
 

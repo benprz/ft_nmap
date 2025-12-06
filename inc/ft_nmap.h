@@ -131,7 +131,7 @@ struct	timer_data
 
 extern struct nmap				nmap;
 extern struct ports				ports;
-extern struct sockets			sockets;
+extern int						send_sock;
 extern struct task				*tasks;
 extern struct result			*results;
 extern size_t					nb_results;
@@ -154,7 +154,9 @@ int		create_target_result(in_addr_t target);
 void	free_results(struct result *results);
 void	scan(pcap_t *handle, struct sockaddr_in src, struct sockaddr_in tgt,
 				enum scan_type scan, struct timer_data *timer_data);
-
+enum scan_result	interpret_packet(const u_char *packet, enum scan_type scan);
+int 	send_probe(struct sockaddr_in src, struct sockaddr_in tgt,
+				enum scan_type scan);
 
 // utils functions
 int todo(char*);
