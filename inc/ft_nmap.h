@@ -116,12 +116,6 @@ struct	ports
 	unsigned short int	udp;
 };
 
-struct	sockets
-{
-	int	tcp;
-	int	udp;
-};
-
 // handle in the struct is set to NULL right before being closed so
 // pcap_breakloop isn't called on a handle that's been closed
 struct	timer_data

@@ -29,7 +29,6 @@ struct nmap nmap = {
 };
 
 struct ports	ports;
-struct sockets	sockets;
 int				send_sock;
 struct task		*tasks = NULL; // liste chaînée
 struct result	*results = NULL; // array
