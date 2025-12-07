@@ -2,10 +2,11 @@
 #include "ft_nmap.h"
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
+#include <netinet/udp.h>
 #include <stdlib.h>
 #include <string.h>
 
-uint16_t	checksum(struct tcphdr tcphdr, struct sockaddr_in src,
+uint16_t	checksum_tcp(struct tcphdr tcphdr, struct sockaddr_in src,
 					struct sockaddr_in tgt)
 {
 	size_t			i;
@@ -31,75 +32,125 @@ uint16_t	checksum(struct tcphdr tcphdr, struct sockaddr_in src,
 	return (~sum);
 }
 
-int send_udp_probe(struct sockaddr_in tgt)
+uint16_t	checksum_ip(struct iphdr iphdr)
 {
-	int	ret;
+	size_t			i;
+	uint16_t		*words_iphdr;
+	unsigned long	sum;
 
-	ret = sendto(sockets.udp, "knock knock", 11, 0, (struct sockaddr *) &tgt,
-					sizeof(tgt));
-	if (ret == -1)
+	sum = 0;
+	i = 0;
+	words_iphdr = (uint16_t *) &iphdr;
+	while (i < sizeof(iphdr) / 2)
 	{
-		perror("sendto");
-		return (1);
+		sum += words_iphdr[i];
+		i++;
 	}
-	return (0);
+	while (sum >> 16)
+		sum = (sum & 0xffff) + (sum >> 16);
+	return (~sum);
 }
 
-int send_tcp_probe(struct sockaddr_in src, struct sockaddr_in tgt,
-				enum scan_type scan)
+void	fill_iphdr(struct iphdr *iphdr, struct sockaddr_in src,
+					struct sockaddr_in tgt, enum scan_type scan)
 {
-	struct tcphdr	tcphdr;
-	struct sockaddr	*tgt_ptr;
-	int				ret;
+	uint16_t total_size;
 
-	memset(&tcphdr, 0, sizeof(tcphdr));
-	tcphdr.dest = tgt.sin_port;
-	tcphdr.source = src.sin_port;
+	memset(iphdr, 0, sizeof(struct iphdr));
+	iphdr->version = 4;
+	iphdr->ihl = 5;
+	iphdr->tos = 0;
+	total_size = sizeof(struct iphdr);
+	total_size += (scan == UDP) ?
+		sizeof(struct udphdr) + sizeof(UDP_PAYLOAD) : sizeof(struct tcphdr);
+	iphdr->tot_len = htons(total_size);
 	// thread safety ?
 	srandom(time(NULL));
-	tcphdr.seq = htonl(random());
-	tcphdr.doff = 5;
+	iphdr->id = htonl(random());
+	iphdr->frag_off = 0;
+	iphdr->ttl = 64;
+	iphdr->protocol = (scan == UDP) ? IPPROTO_UDP : IPPROTO_TCP;
+	iphdr->saddr = src.sin_addr.s_addr;
+	iphdr->daddr = tgt.sin_addr.s_addr;
+	iphdr->check = checksum_ip(*iphdr);
+}
+
+void	fill_udphdr(struct udphdr *udphdr, struct sockaddr_in src,
+					struct sockaddr_in tgt)
+{
+	memset(udphdr, 0, sizeof(struct udphdr));
+	udphdr->source = src.sin_addr.s_addr;
+	udphdr->dest = tgt.sin_addr.s_addr;
+	udphdr->len = htons(sizeof(struct udphdr) + sizeof(UDP_PAYLOAD));
+	// no checksum because apparently it's optional ¯\_(ツ)_/¯
+}
+
+void	fill_tcphdr(struct tcphdr *tcphdr, struct sockaddr_in src,
+					struct sockaddr_in tgt, enum scan_type scan)
+{
+	memset(tcphdr, 0, sizeof(*tcphdr));
+	tcphdr->dest = tgt.sin_port;
+	tcphdr->source = src.sin_port;
+	// thread safety ?
+	srandom(time(NULL));
+	tcphdr->seq = htonl(random());
+	tcphdr->doff = 5;
 	switch (scan)
 	{
 		case SYN:
-			tcphdr.syn = 1;
+			tcphdr->syn = 1;
 			break;
 		case ACK:
-			tcphdr.ack = 1;
+			tcphdr->ack = 1;
 			break;
 		case FIN:
-			tcphdr.fin = 1;
+			tcphdr->fin = 1;
 			break;
 		case XMAS:
-			tcphdr.fin = 1;
-			tcphdr.psh = 1;
-			tcphdr.urg = 1;
+			tcphdr->fin = 1;
+			tcphdr->psh = 1;
+			tcphdr->urg = 1;
 			break;
 		default:
 			break;
 	}
-	tcphdr.window = htons(5840);
-	tcphdr.check = checksum(tcphdr, src, tgt);
-	tgt_ptr = (struct sockaddr *) &tgt;
-	ret = sendto(sockets.tcp, &tcphdr, sizeof(tcphdr), 0, tgt_ptr, sizeof(tgt));
+	tcphdr->window = htons(5840);
+	tcphdr->check = checksum_tcp(*tcphdr, src, tgt);
+}
+
+int	send_probe(struct sockaddr_in src, struct sockaddr_in tgt,
+				enum scan_type scan)
+{
+	// size of iphdr + tcphdr because tcphdr is bigger than udphdr anyway
+	char			packet[sizeof(struct iphdr) + sizeof(struct tcphdr)];
+	struct iphdr	*iphdr;
+	struct tcphdr	*tcphdr;
+	struct udphdr	*udphdr;
+	int				ret;
+	int				packet_size;
+
+	iphdr = (struct iphdr *) packet;
+	fill_iphdr(iphdr, src, tgt, scan);
+	if (scan == UDP)
+	{
+		udphdr = (struct udphdr *) (packet + sizeof(struct iphdr));
+		fill_udphdr(udphdr, src, tgt);
+		memcpy(packet + sizeof(struct iphdr) + sizeof(struct udphdr),
+				UDP_PAYLOAD, sizeof(UDP_PAYLOAD));
+		packet_size = sizeof(*iphdr) + sizeof(*udphdr) + sizeof(UDP_PAYLOAD);
+	}
+	else
+	{
+		tcphdr = (struct tcphdr *) (packet + sizeof(struct iphdr));
+		fill_tcphdr(tcphdr, src, tgt, scan);
+		packet_size = sizeof(*iphdr) + sizeof(*tcphdr);
+	}
+	ret = sendto(send_sock, packet, packet_size, 0, (struct sockaddr *) &tgt,
+					sizeof(struct sockaddr_in));
 	if (ret == -1)
 	{
-		perror("sendto");
+		perror("Couldn't send probe");
 		return (1);
 	}
 	return (0);
-}
-
-int send_probe(struct sockaddr_in src, struct sockaddr_in tgt,
-				enum scan_type scan)
-{
-	if (scan == UDP)
-		return(send_udp_probe(tgt));
-	else if (scan == ALL)
-	{
-		fprintf(stderr, "Sending a probe for \"ALL\"??? WTF??\n");
-		return (1);
-	}
-	else
-		return(send_tcp_probe(src, tgt, scan));
 }
