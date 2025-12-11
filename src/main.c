@@ -24,11 +24,12 @@ struct nmap nmap = {
 	1024, // port end
 	NULL, // target_opt (-t argument)
 	NULL, // target_file (-t argument)
-	NULL // target_arg (non option argument)
+	NULL, // target_arg (non option argument)
+	{0} // spoofed source
 };
 
 struct ports	ports;
-struct sockets	sockets;
+int				send_sock;
 struct task		*tasks = NULL; // liste chaînée
 struct result	*results = NULL; // array
 size_t			nb_results = 0;
@@ -71,7 +72,6 @@ int parse_host(char *hostname)
 	return 0;
 }
 
-
 // lpcap 1.8.0 minimum version (see pcap_compile man page)
 int main(int argc, char **argv)
 {
@@ -81,6 +81,7 @@ int main(int argc, char **argv)
 		{"ports", 'p', "PORT/RANGE", 0, "target ports(s) to scan (single port or range with format (n-m) (max number of ports: 1024)", 0},
 		{"threads", 'm', "THREADS", 0, "maximum number of threads to use for the scan (default: 10) (max: 250)", 0},
 		{"scan", 's', "TYPE", 0, "type of scan to use, must be one of SYN, NULL, ACK, FIN, XMAS, UDP (all used if not specified)", 0},
+		{"spoof", 'S', "ADDRESS", 0, "Source IP address to use", 0},
 		{0}
 	};
 
