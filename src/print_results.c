@@ -1,22 +1,18 @@
-	#include "ft_nmap.h"
+#include "ft_nmap.h"
 #include <stdio.h>
 #include <string.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <time.h>
 
-// Get service name for a port using getservbyport
-// Returns "Unassigned" if no service found
 const char *get_service_name(uint16_t port)
 {
 	struct servent *serv;
 
-	// Try TCP first (most common)
 	serv = getservbyport(htons(port), "tcp");
 	if (serv)
 		return serv->s_name;
 	
-	// Try UDP
 	serv = getservbyport(htons(port), "udp");
 	if (serv)
 		return serv->s_name;
@@ -24,7 +20,6 @@ const char *get_service_name(uint16_t port)
 	return "Unassigned";
 }
 
-// Get scan type name as string
 const char *scan_type_to_str(enum scan_type scan)
 {
 	switch (scan)
@@ -39,7 +34,6 @@ const char *scan_type_to_str(enum scan_type scan)
 	}
 }
 
-// Get capitalized scan result string for conclusion
 const char *scan_result_to_str_capitalized(enum scan_result r)
 {
 	switch (r)
@@ -53,7 +47,7 @@ const char *scan_result_to_str_capitalized(enum scan_result r)
 	}
 }
 
-// Format scan result for display (e.g., "SYN (Open)", "NULL (Closed)")
+// example: "SYN (Open)", "NULL (Closed)"
 void format_scan_result(char *buf, size_t buf_size, enum scan_type scan, enum scan_result result)
 {
 	const char *scan_str = scan_type_to_str(scan);
@@ -63,18 +57,13 @@ void format_scan_result(char *buf, size_t buf_size, enum scan_type scan, enum sc
 }
 
 // Determine final conclusion for a port based on all scan results
-// This is a simplified version - we can refine the logic
+// Open, Unfiltered, Filtered, Closed
 enum scan_result determine_final_conclusion(uint32_t port_value, enum scan_type enabled_scans[])
 {
-	// For now, prioritize OPEN results
-	// If any scan shows OPEN, the port is OPEN
-	// Otherwise, check other states
-	
 	bool has_open = false;
 	bool has_unfiltered = false;
 	bool has_filtered = false;
 	
-	// Check each enabled scan type
 	for (int i = 0; enabled_scans[i] != -1 && i < 6; i++)
 	{
 		enum scan_type scan = enabled_scans[i];
@@ -98,7 +87,6 @@ enum scan_result determine_final_conclusion(uint32_t port_value, enum scan_type 
 	return SR_CLOSED;
 }
 
-// Print scan configuration header
 void print_scan_config(void)
 {
 	struct in_addr addr;
@@ -106,35 +94,29 @@ void print_scan_config(void)
 	
 	printf("\nScan Configurations:\n");
 	
-	// Target IP - we'll use the first result's target
-	if (nb_results > 0)
-	{
-		addr.s_addr = results[0].target;
+	for (size_t i = 0; i < nb_results; i++)
+	{	
+		addr.s_addr = results[i].target;
 		if (inet_ntop(AF_INET, &addr, ip_str, INET_ADDRSTRLEN))
 			printf("  Target Ip-Address: %s\n", ip_str);
 	}
 	
-	// Number of ports
 	printf("  No of Ports to scan: %u\n", nmap.port_end - nmap.port_start + 1);
 	
-	// Scans to be performed
 	printf("  Scans to be performed: ");
 	if (nmap.scan == ALL)
 		printf("SYN NULL FIN XMAS ACK UDP\n");
 	else
 		printf("%s\n", scan_type_to_str(nmap.scan));
 	
-	// Number of threads
 	printf("  No of threads: %u\n", nmap.threads);
 }
 
-// Print scan duration
 void print_scan_duration(double duration_secs)
 {
 	printf("Scan took %.5f secs\n", duration_secs);
 }
 
-// Print results table header
 void print_table_header(void)
 {
 	printf("%-8s %-30s %-60s %-15s\n", "Port", "Service Name (if applicable)", "Results", "Conclusion");
@@ -148,7 +130,7 @@ void print_port_result(uint16_t port, uint32_t port_value, enum scan_type enable
 	char results_buf[256] = {0};
 	char temp_buf[64];
 	bool first = true;
-	
+
 	// Build results string
 	for (int i = 0; enabled_scans[i] != -1 && i < 6; i++)
 	{
@@ -176,6 +158,7 @@ void print_results(double scan_duration)
 	enum scan_type enabled_scans[7] = {-1, -1, -1, -1, -1, -1, -1};
 	
 	// Build list of enabled scan types
+	// its either all or only one scan type
 	if (nmap.scan == ALL)
 	{
 		enabled_scans[0] = SYN;

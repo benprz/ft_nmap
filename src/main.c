@@ -32,7 +32,7 @@ struct nmap nmap = {
 struct ports	ports;
 int				send_sock;
 struct task		*tasks = NULL; // liste chaînée
-struct result	*results = NULL; // array
+struct result	*results = NULL; // array of results per target
 size_t			nb_results = 0;
 pthread_mutex_t	task_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t	result_mutex = PTHREAD_MUTEX_INITIALIZER;

@@ -99,6 +99,7 @@ struct	task
 	struct task			*next;
 };
 
+// per target
 struct	result
 {
 	in_addr_t	target;
@@ -162,5 +163,6 @@ char	*trim_whitespaces(char *str);
 void	print_task(struct task task);
 const char *scan_result_to_str(enum scan_result r);
 void	print_results_debug(void);
+void	print_results(double scan_duration);
 
 #endif
