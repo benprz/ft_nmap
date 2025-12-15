@@ -105,6 +105,8 @@ int main(int argc, char **argv)
 	struct timespec start, end;
 	clock_gettime(CLOCK_MONOTONIC, &start);
 	
+	print_scan_config();
+	printf("Scanning..\n");
 	if (ft_nmap())
 	{
 		free(tasks);

@@ -174,8 +174,6 @@ void print_results(double scan_duration)
 		enabled_scans[0] = nmap.scan;
 	}
 	
-	print_scan_config();
-	printf("Scanning..\n");
 	print_scan_duration(scan_duration);
 	
 	// nb_results is the number of targets to scan
