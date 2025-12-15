@@ -43,7 +43,8 @@ enum	probe_response
 };
 
 // 1 second, which is the default timeout for nmap, you can check it with -Pn option
-// -Pn option means that the scan will be performed without pinging the target, so no timeout measurement is done (which helps to speed up the scan)
+// -Pn option means that the scan will be performed without pinging the target, 
+// so no timeout measurement is done (which is supposed to help to speed up the scan)
 #define INITIAL_RTT_TIMEOUT 1 
 
 // BPF filter for capturing relevant packets for port TCP/SYN scan result
@@ -117,7 +118,7 @@ struct	ports
 	unsigned short int	udp;
 };
 
-// handle in the struct is set to NULL right before being closed so
+// the handle in the struct is set to NULL right before being closed so
 // pcap_breakloop isn't called on a handle that's been closed
 struct	timer_data
 {

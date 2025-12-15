@@ -151,7 +151,8 @@ void print_port_result(uint16_t port, uint32_t port_value, enum scan_type enable
 	printf("%-8u %-30s %-60s %-15s\n", port, service, results_buf, conclusion);
 }
 
-// Main function to print all results
+// Main function
+// prints all the post-scan output (scan config, scan duration, results for each target)
 void print_results(double scan_duration)
 {
 	size_t i;
@@ -173,12 +174,12 @@ void print_results(double scan_duration)
 		enabled_scans[0] = nmap.scan;
 	}
 	
-	// Print configuration
 	print_scan_config();
 	printf("Scanning..\n");
 	print_scan_duration(scan_duration);
 	
-	// Process each target
+	// nb_results is the number of targets to scan
+	// prints results for each target
 	for (i = 0; i < nb_results; i++)
 	{
 		struct in_addr addr;
