@@ -413,7 +413,7 @@ int ft_nmap() {
 	}
 	bzero(threads, nmap.threads * sizeof(pthread_t));
 
-	print_tasks(tasks);
+	//print_tasks(tasks);
 	for (int i = 0; i < nmap.threads; i++) {
 		if (pthread_create(&threads[i], NULL, thread_routine, NULL) == -1) {
 			perror("pthread_create-> ");

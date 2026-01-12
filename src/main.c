@@ -11,6 +11,7 @@
 #include <sys/socket.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <time.h>
 
 #include "ft_nmap.h"
 
@@ -31,7 +32,7 @@ struct nmap nmap = {
 struct ports	ports;
 int				send_sock;
 struct task		*tasks = NULL; // liste chaînée
-struct result	*results = NULL; // array
+struct result	*results = NULL; // array of results per target
 size_t			nb_results = 0;
 pthread_mutex_t	task_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t	result_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -95,12 +96,26 @@ int main(int argc, char **argv)
 	}
 	if (create_recv_sockets()
 		|| create_send_sockets()
-		|| create_tasks()
-		|| ft_nmap())
+		|| create_tasks())
 	{
 		free(tasks);
 		return (2);
 	}
-	print_results_debug();
+	
+	struct timespec start, end;
+	clock_gettime(CLOCK_MONOTONIC, &start);
+	
+	print_scan_config();
+	printf("Scanning..\n");
+	if (ft_nmap())
+	{
+		free(tasks);
+		return (2);
+	}
+	
+	clock_gettime(CLOCK_MONOTONIC, &end);
+	double duration = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
+	
+	print_results(duration);
 	return (0);
 }
