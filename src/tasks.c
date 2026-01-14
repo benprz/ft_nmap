@@ -169,7 +169,7 @@ int file_create_all_tasks(FILE *file, int src_addr_sock)
 	len = 0;
 	next_target = NULL;
 	ret = 0;
-	while ((getline(&next_target, &len, file)) != -1 || ret)
+	while ((getline(&next_target, &len, file)) != -1 && !ret)
 	{
 		clean_target = trim_whitespaces(next_target);
 		if (strlen(clean_target) > 0
