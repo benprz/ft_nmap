@@ -84,7 +84,8 @@ int parse_delay(char *str)
 	long delay = atoi(str);
 	if (delay <= 0)
 		return (1);
-	timeout_delay.it_value.tv_nsec = delay * 1000000;
+	timeout_delay.it_value.tv_sec =  delay / 1000;
+	timeout_delay.it_value.tv_nsec = (delay % 1000) * 1000000;
 	return (0);
 }
 
