@@ -6,42 +6,34 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-void	print_args(struct nmap args)
-{
-	char	buff[INET_ADDRSTRLEN];
-
-	fprintf(stdout, "scan: %d\n", args.scan);
-	fprintf(stdout, "threads: %d\n", args.threads);
-	fprintf(stdout, "port start: %d\n", args.port_start);
-	fprintf(stdout, "port end: %d\n", args.port_end);
-	fprintf(stdout, "target opt: %s\n", args.target_opt);
-	fprintf(stdout, "target file name: %s\n", args.target_file);
-	fprintf(stdout, "target arg: %s\n", args.target_arg);
-	if (!inet_ntop(AF_INET, &args.spoofed_source.sin_addr, buff, INET_ADDRSTRLEN))
-		perror("inet_ntop");
-	else
-	{
-		fprintf(stdout, "spoofed source: %s\n", buff);
-		fprintf(stdout, "src sin_family: %d\n", args.spoofed_source.sin_family);
-	}
-}
 
 int parse_scan(char *str)
 {
+	enum scan_type scan;
+	static bool scans_specified = false;
+
 	if (!strcmp(str, "SYN"))
-		nmap.scan = SYN;
+		scan = SYN;
 	else if (!strcmp(str, "NULL"))
-		nmap.scan = NUL;
+		scan = NUL;
 	else if (!strcmp(str, "ACK"))
-		nmap.scan = ACK;
+		scan = ACK;
 	else if (!strcmp(str, "FIN"))
-		nmap.scan = FIN;
+		scan = FIN;
 	else if (!strcmp(str, "XMAS"))
-		nmap.scan = XMAS;
+		scan = XMAS;
 	else if (!strcmp(str, "UDP"))
-		nmap.scan = UDP;
+		scan = UDP;
 	else
 		return (1);
+
+	// First time -s is seen, clear defaults and mark as user-specified
+	if (!scans_specified)
+	{
+		memset(nmap.scans, 0, sizeof(nmap.scans));
+		scans_specified = true;
+	}
+	nmap.scans[scan] = true;
 	return (0);
 }
 
@@ -87,6 +79,15 @@ int	parse_port(char *str)
 	return (0);
 }
 
+int parse_delay(char *str)
+{
+	long delay = atoi(str);
+	if (delay <= 0)
+		return (1);
+	timeout_delay.it_value.tv_nsec = delay * 1000000;
+	return (0);
+}
+
 int parse_options(int key, char *arg, struct argp_state *state)
 {
 	UNUSED(arg);
@@ -106,8 +107,6 @@ int parse_options(int key, char *arg, struct argp_state *state)
 			nmap.threads = atoi(arg);
 			if (nmap.threads > 250)
 				argp_error(state, "max number of threads: 250");
-			else if (nmap.threads == 0)
-				nmap.threads = 1;
 			break;
 		case 'p':
 			if (parse_port(arg))
@@ -119,6 +118,10 @@ int parse_options(int key, char *arg, struct argp_state *state)
 		case 'f':
 			nmap.target_file = arg;
 			break;
+		case 'T':
+			if (parse_delay(arg))
+				argp_error(state, "bad delay");
+			break;
 		case ARGP_KEY_ARG:
 			if (nmap.target_arg)
 				argp_error(state, "too many arguments");
@@ -127,6 +130,10 @@ int parse_options(int key, char *arg, struct argp_state *state)
 		case ARGP_KEY_END:
 			if (!nmap.target_file && !nmap.target_opt && !nmap.target_arg)
 				argp_error(state, "no target provided");
+			break;
+		case ARGP_KEY_NO_ARGS:
+			argp_help(state->root_argp, state->out_stream, ARGP_HELP_STD_HELP, state->name);
+			exit(0);
 		/* FALLTHROUGH */
 		default:
 			return ARGP_ERR_UNKNOWN;

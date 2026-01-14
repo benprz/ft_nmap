@@ -18,14 +18,13 @@ SRC =	main.c \
 		scan.c \
 		scan_send_probe.c \
 		scan_interpret_response.c \
-		scan_utils.c \
 		utils.c \
 		print_results.c
 
 OBJ_DIR = .obj/
 OBJ = $(SRC:%.c=$(OBJ_DIR)%.o)
 
-.PHONY : all clean fclean re $(EXE)
+.PHONY : all clean fclean re
 
 all: $(EXE)
 

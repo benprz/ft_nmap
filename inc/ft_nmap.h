@@ -24,11 +24,9 @@
 // #define TCP_FILTER_FORMAT "ip src %u.%u.%u.%u && dst %u.%u.%u.%u && ((tcp && src port %u && dst port %u) || (icmp && icmp[icmptype] == 3 && (icmp[icmpcode] == 0 || icmp[icmpcode] == 1 || icmp[icmpcode] == 2 || icmp[icmpcode] == 3 || icmp[icmpcode] == 9 || icmp[icmpcode] == 10 || icmp[icmpcode] == 13) && (icmp[8] & 0xf0) == 0x40 && icmp[17] == 6 && icmp[8 + ((icmp[8] & 0xf) * 4):2] == %u && icmp[8 + ((icmp[8] & 0xf) * 4) + 2:2] == %u))"
 #define UDP_FILTER_FORMAT "ip src %u.%u.%u.%u && dst %u.%u.%u.%u && ((udp && src port %u && dst port %u) || (icmp && icmp[icmptype] == 3 && (icmp[icmpcode] == 0 || icmp[icmpcode] == 1 || icmp[icmpcode] == 2 || icmp[icmpcode] == 3 || icmp[icmpcode] == 9 || icmp[icmpcode] == 10 || icmp[icmpcode] == 13) && (icmp[8] & 0xf0) == 0x40 && icmp[17] == 17 && icmp[8 + ((icmp[8] & 0xf) * 4):2] == %u && icmp[8 + ((icmp[8] & 0xf) * 4) + 2:2] == %u))"
 
-// ALL est à -1 parce que les vrais scans commencent à SYN, comme ça pour
-// le tableau de résultat tu peux utiliser scan_type comme indice du tableau
 enum	scan_type
 {
-	ALL = -1, SYN = 0, NUL = 1, ACK = 2, FIN = 3, XMAS = 4, UDP = 5
+	NONE = -1, SYN = 0, NUL = 1, ACK = 2, FIN = 3, XMAS = 4, UDP = 5
 };
 
 enum	scan_result
@@ -42,10 +40,11 @@ enum	probe_response
 	PR_TCP_SYNACK = 0, PR_TCP_RST, PR_UDP, PR_ICMP_3_3, PR_ICMP_OTHER, PR_NONE
 };
 
-// 1 second, which is the default timeout for nmap, you can check it with -Pn option
+// 100 milliseconds, the default timeout for nmap is 1 second, you can check it with -Pn option
 // -Pn option means that the scan will be performed without pinging the target, 
 // so no timeout measurement is done (which is supposed to help to speed up the scan)
-#define INITIAL_RTT_TIMEOUT 1 
+// but nmap probably still measures the timeout of previous probes to speed up the scan
+#define INITIAL_RTT_TIMEOUT 100 
 
 // BPF filter for capturing relevant packets for port TCP/SYN scan result
 // https://nmap.org/book/synscan.html
@@ -82,7 +81,8 @@ enum	probe_response
 
 struct	nmap
 {
-	enum scan_type		scan; // type of scan to use
+	// enabled scan types, indexed by enum scan_type value (SYN..UDP)
+	bool				scans[6];
 	uint16_t			threads; // number of threads
 	uint16_t			port_start;
 	uint16_t			port_end;
@@ -90,6 +90,12 @@ struct	nmap
 	char				*target_file; // argument of -f
 	char				*target_arg; // non option argument
 	struct sockaddr_in	spoofed_source;
+};
+
+struct target {
+	in_addr_t			addr;
+	char				name[NI_MAXHOST];
+	struct target		*next;
 };
 
 struct	task
@@ -128,13 +134,14 @@ struct	timer_data
 
 extern struct nmap				nmap;
 extern struct ports				ports;
+extern struct target			*targets;
 extern int						send_sock;
 extern struct task				*tasks;
 extern struct result			*results;
 extern size_t					nb_results;
 extern pthread_mutex_t			task_mutex;
 extern pthread_mutex_t			result_mutex;
-extern const struct itimerspec	default_delay;
+extern struct itimerspec	timeout_delay;
 extern const struct itimerspec	empty_delay;
 // usage: result_lookup[scan_type][probe_response] gives you a scan_result
 extern const int				result_lookup[6][6];
@@ -142,7 +149,7 @@ extern const int				result_lookup[6][6];
 int		ft_nmap(void);
 int		parse_options(int key, char *arg, struct argp_state *state);
 int		create_tasks(void);
-void    print_tasks(struct task *task_list);
+void	free_tasks(struct task *tasks);
 int		create_recv_sockets(void);
 int		create_send_sockets(void);
 void	add_result(in_addr_t target, unsigned short port,  enum scan_type scan,
@@ -158,12 +165,9 @@ int 	send_probe(struct sockaddr_in src, struct sockaddr_in tgt,
 // utils functions
 int todo(char*);
 
-uint16_t calculate_checksum(uint16_t *, int);
 void    print_args(struct nmap args);
 char	*trim_whitespaces(char *str);
-void	print_task(struct task task);
 const char *scan_result_to_str(enum scan_result r);
-void	print_results_debug(void);
 void	print_scan_config(void);
 void	print_results(double scan_duration);
 

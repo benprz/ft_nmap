@@ -12,69 +12,7 @@
 #include <unistd.h>
 #include <netinet/in.h>
 
-void	print_task(struct task task)
-{
-	char	tgt[1024];
-	char	src[1024];
-	char	tgt_port[20];
-	char	src_port[20];
-	int		ret;
-
-	ret = getnameinfo((struct sockaddr *) &task.target,
-	            sizeof(struct sockaddr_in), tgt, sizeof(tgt),
-	            tgt_port, sizeof(tgt_port), 0);
-	if (ret)
-	{
-		fprintf(stderr, "tgt getnameinfo: %s\n", gai_strerror(ret));
-		return;
-	}
-	ret = getnameinfo((struct sockaddr *) &task.source,
-	            sizeof(struct sockaddr_in), src, sizeof(src),
-	            src_port, sizeof(src_port), 0);
-	if (ret)
-	{
-		fprintf(stderr, "src getnameinfo: %s\n", gai_strerror(ret));
-		return;
-	}
-	dprintf(1, "target: %s, target port: %s, source: %s, source port: %s, scan: ",
-			tgt, tgt_port, src, src_port);
-	switch (task.scan)
-	{
-		case ALL:
-			dprintf(1, "ALL\n");
-			break;
-		case SYN:
-			dprintf(1, "SYN\n");
-			break;
-		case ACK:
-			dprintf(1, "ACK\n");
-			break;
-		case NUL:
-			dprintf(1, "NUL\n");
-			break;
-		case FIN:
-			dprintf(1, "FIN\n");
-			break;
-		case XMAS:
-			dprintf(1, "XMAS\n");
-			break;
-		case UDP:
-			dprintf(1, "UDP\n");
-			break;
-	}
-}
-
-void	print_tasks(struct task *task_list)
-{
-	printf("Task list:\n");
-	while (task_list)
-	{
-		print_task(*task_list);
-		task_list = task_list->next;
-	}
-}
-
-void	free_task_list(struct task *list)
+void	free_tasks(struct task *list)
 {
 	struct task	*next;
 
@@ -123,26 +61,17 @@ void	target_create_all_tasks(struct sockaddr_in tgt, struct sockaddr_in src)
 	for (uint16_t i = nmap.port_start; i <= nmap.port_end; i++)
 	{
 		tgt.sin_port = htons(i);
-		if (nmap.scan == ALL)
-		{
+		if (nmap.scans[SYN])
 			create_task(tgt, src, SYN, ports.syn);
+		if (nmap.scans[NUL])
 			create_task(tgt, src, NUL, ports.null);
+		if (nmap.scans[ACK])
 			create_task(tgt, src, ACK, ports.ack);
+		if (nmap.scans[FIN])
 			create_task(tgt, src, FIN, ports.fin);
+		if (nmap.scans[XMAS])
 			create_task(tgt, src, XMAS, ports.xmas);
-			create_task(tgt, src, UDP, ports.udp);
-		}
-		else if (nmap.scan == SYN)
-			create_task(tgt, src, SYN, ports.syn);
-		else if (nmap.scan == NUL)
-			create_task(tgt, src, NUL, ports.null);
-		else if (nmap.scan == ACK)
-			create_task(tgt, src, ACK, ports.ack);
-		else if (nmap.scan == FIN)
-			create_task(tgt, src, FIN, ports.fin);
-		else if (nmap.scan == XMAS)
-			create_task(tgt, src, XMAS, ports.xmas);
-		else if (nmap.scan == UDP)
+		if (nmap.scans[UDP])
 			create_task(tgt, src, UDP, ports.udp);
 	}
 }
@@ -174,6 +103,26 @@ int	get_src_sockaddr(int sock, const struct sockaddr_in *tgt, struct sockaddr_in
 	return (0);
 }
 
+int add_target(in_addr_t addr, char *name)
+{
+	struct target *target = targets;
+	target = malloc(sizeof(struct target));
+	if (!target)
+		return (2);
+	strcpy(target->name, name);
+	target->addr = addr;
+	target->next = targets;
+	targets = target;
+
+	target = target->next;
+	while (target) {
+		if (target->addr == addr)
+			return (1);
+		target = target->next;
+	}
+	return (0);
+}
+
 int	get_tgt_sockaddr(char *target, struct sockaddr_in *addr)
 {
 	struct addrinfo	*info;
@@ -191,9 +140,22 @@ int	get_tgt_sockaddr(char *target, struct sockaddr_in *addr)
 		return (1);
 	}
 	*addr = * (struct sockaddr_in *) info->ai_addr;
+	if ((ret = add_target(addr->sin_addr.s_addr, target)) == 1)
+	{
+		// target already exists	
+		freeaddrinfo(info);
+		return (1);
+	}
+	else if (ret == 2)
+	{
+		fprintf(stderr, "%s: %s\n", target, strerror(errno));
+		freeaddrinfo(info);
+		return (2);
+	}
 	freeaddrinfo(info);
 	return (0);
 }
+
 
 int file_create_all_tasks(FILE *file, int src_addr_sock)
 {
@@ -279,7 +241,9 @@ int	create_tasks(void)
 error:
 	close(src_addr_sock);
 error_no_close:
-	free_task_list(tasks);
+	free_tasks(tasks);
+	tasks = NULL;
 	free_results(results);
+	results = NULL;
 	return (1);
 }

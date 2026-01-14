@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <time.h>
+#include <stdlib.h>
 
 const char *get_service_name(uint16_t port)
 {
@@ -57,34 +58,39 @@ void format_scan_result(char *buf, size_t buf_size, enum scan_type scan, enum sc
 }
 
 // Determine final conclusion for a port based on all scan results
-// Open, Unfiltered, Filtered, Closed
+// Open, Closed, Unfiltered, Filtered, Open|Filtered
 enum scan_result determine_final_conclusion(uint32_t port_value, enum scan_type enabled_scans[])
 {
 	bool has_open = false;
+	bool has_closed = false;
 	bool has_unfiltered = false;
 	bool has_filtered = false;
 	
-	for (int i = 0; enabled_scans[i] != -1 && i < 6; i++)
+	for (int i = 0; enabled_scans[i] != -1 && i <= 5; i++)
 	{
 		enum scan_type scan = enabled_scans[i];
 		enum scan_result result = (enum scan_result)((port_value >> (scan * 3)) & 0x7);
 		
 		if (result == SR_OPEN)
 			has_open = true;
+		else if (result == SR_CLOSED)
+			has_closed = true;
 		else if (result == SR_UNFILTERED)
 			has_unfiltered = true;
-		else if (result == SR_FILTERED || result == SR_OPEN_FILTERED)
+		else if (result == SR_FILTERED)
 			has_filtered = true;
 	}
 	
 	if (has_open)
 		return SR_OPEN;
+	if (has_closed)
+		return SR_CLOSED;
 	if (has_unfiltered)
 		return SR_UNFILTERED;
 	if (has_filtered)
 		return SR_FILTERED;
 	
-	return SR_CLOSED;
+	return SR_OPEN_FILTERED;
 }
 
 void print_scan_config(void)
@@ -94,20 +100,29 @@ void print_scan_config(void)
 	
 	printf("\nScan Configurations:\n");
 	
-	for (size_t i = 0; i < nb_results; i++)
+	printf("  Targets to scan:\n");
+	for (struct target *target = targets; target; target = target->next)
 	{	
-		addr.s_addr = results[i].target;
+		addr.s_addr = target->addr;
 		if (inet_ntop(AF_INET, &addr, ip_str, INET_ADDRSTRLEN))
-			printf("  Target Ip-Address: %s\n", ip_str);
+			printf("      %s (%s)\n", target->name, ip_str);
 	}
 	
 	printf("  No of Ports to scan: %u\n", nmap.port_end - nmap.port_start + 1);
 	
 	printf("  Scans to be performed: ");
-	if (nmap.scan == ALL)
-		printf("SYN NULL FIN XMAS ACK UDP\n");
-	else
-		printf("%s\n", scan_type_to_str(nmap.scan));
+	bool first = true;
+	for (enum scan_type s = SYN; s <= UDP; s++)
+	{
+		if (nmap.scans[s])
+		{
+			if (!first)
+				printf(" ");
+			printf("%s", scan_type_to_str(s));
+			first = false;
+		}
+	}
+	printf("\n");
 	
 	printf("  No of threads: %u\n", nmap.threads);
 }
@@ -132,7 +147,7 @@ void print_port_result(uint16_t port, uint32_t port_value, enum scan_type enable
 	bool first = true;
 
 	// Build results string
-	for (int i = 0; enabled_scans[i] != -1 && i < 6; i++)
+	for (int i = 0; enabled_scans[i] != -1 && i <= 5; i++)
 	{
 		enum scan_type scan = enabled_scans[i];
 		enum scan_result result = (enum scan_result)((port_value >> (scan * 3)) & 0x7);
@@ -156,22 +171,14 @@ void print_port_result(uint16_t port, uint32_t port_value, enum scan_type enable
 void print_results(double scan_duration)
 {
 	size_t i;
-	enum scan_type enabled_scans[7] = {-1, -1, -1, -1, -1, -1, -1};
+	enum scan_type enabled_scans[6] = {-1, -1, -1, -1, -1, -1};
 	
-	// Build list of enabled scan types
-	// its either all or only one scan type
-	if (nmap.scan == ALL)
+	// Build list of enabled scan types from nmap.scans[]
+	int idx = 0;
+	for (enum scan_type s = SYN; s <= UDP && idx < 6; s++)
 	{
-		enabled_scans[0] = SYN;
-		enabled_scans[1] = NUL;
-		enabled_scans[2] = ACK;
-		enabled_scans[3] = FIN;
-		enabled_scans[4] = XMAS;
-		enabled_scans[5] = UDP;
-	}
-	else
-	{
-		enabled_scans[0] = nmap.scan;
+		if (nmap.scans[s])
+			enabled_scans[idx++] = s;
 	}
 	
 	print_scan_duration(scan_duration);
@@ -188,8 +195,23 @@ void print_results(double scan_duration)
 		addr.s_addr = results[i].target;
 		if (!inet_ntop(AF_INET, &addr, ip_str, INET_ADDRSTRLEN))
 			continue;
-		
-		printf("\nIP address: %s\n", ip_str);
+
+		// Find and print hostname if available
+		const char *hostname = NULL;
+		struct target *tgt = targets;
+		while (tgt) {
+			if (tgt->addr == results[i].target) {
+				hostname = tgt->name;
+				break;
+			}
+			tgt = tgt->next;
+		}
+
+		if (hostname && strlen(hostname)) {
+			printf("\nIP address: %s (%s)\n", ip_str, hostname);
+		} else {
+			printf("\nIP address: %s\n", ip_str);
+		}
 		
 		// Separate open ports from closed/filtered/unfiltered
 		printf("\nOpen ports:\n");
@@ -217,6 +239,10 @@ void print_results(double scan_duration)
 			if (final != SR_OPEN)
 				print_port_result(port, port_value, enabled_scans);
 		}
+		if (i < nb_results - 1)
+			printf("\n");
+		free(results[i].results);
 	}
+	free(results);
 }
 

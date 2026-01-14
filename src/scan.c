@@ -32,7 +32,7 @@ int	create_timer(timer_t *timerid, struct timer_data *data)
 		perror("Couldn't create timer");
 		return (1);
 	}
-	if (timer_settime(*timerid, 0, &default_delay, NULL))
+	if (timer_settime(*timerid, 0, &timeout_delay, NULL))
 	{
 		perror("Couldn't arm timer");
 		return (1);
@@ -129,29 +129,29 @@ void	scan(pcap_t *handle, struct sockaddr_in src, struct sockaddr_in tgt,
 	do
 	{
 		if (send_probe(src, tgt, scan))
+		{
+			timer_delete(timerid);
 			return ;
+		}
 		ret = pcap_next_ex(handle, &pcap_hdr, &packet);
 		// if (ret == 0)
 		// 	fprintf(stdout, "0\n");
 		if (timer_gettime(timerid, &curr_timer))
 		{
 			perror("Couldn't get current timer");
+			timer_delete(timerid);
 			return ;
 		}
 		if (curr_timer.it_value.tv_sec == 0 && curr_timer.it_value.tv_nsec == 0)
 			break;
 	}
 	while (ret == 0);
-	if (timer_settime(timerid, 0, &empty_delay, NULL))
-	{
-		perror("Couldn't disable timer");
-		return ;
-	}
 	// IN THEORY, ret can only be 1, 0 or PCAP_ERROR in this situation
 	// LMAO it can be PCAP_ERROR_BREAK too ig
 	if (ret == PCAP_ERROR)
 	{
 		pcap_perror(handle, "pcap_next_ex");
+		timer_delete(timerid);
 		return ;
 	}
 	else if (ret == 0 || ret == PCAP_ERROR_BREAK)
@@ -163,10 +163,12 @@ void	scan(pcap_t *handle, struct sockaddr_in src, struct sockaddr_in tgt,
 		if (pcap_hdr->caplen != pcap_hdr->len)
 		{
 			fprintf(stderr, "/!\\ LEN (%d) != CAPLEN (%d)\n", pcap_hdr->len, pcap_hdr->caplen);
+			timer_delete(timerid);
 			return ;
 		}
 		result = interpret_packet(packet, scan);
 	}
+	timer_delete(timerid);
 	add_result(tgt.sin_addr.s_addr, ntohs(tgt.sin_port), scan, result);
 }
 
