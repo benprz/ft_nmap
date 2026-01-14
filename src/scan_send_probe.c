@@ -79,8 +79,8 @@ void	fill_udphdr(struct udphdr *udphdr, struct sockaddr_in src,
 					struct sockaddr_in tgt)
 {
 	memset(udphdr, 0, sizeof(struct udphdr));
-	udphdr->source = src.sin_addr.s_addr;
-	udphdr->dest = tgt.sin_addr.s_addr;
+	udphdr->source = src.sin_port;
+	udphdr->dest = tgt.sin_port;
 	udphdr->len = htons(sizeof(struct udphdr) + sizeof(UDP_PAYLOAD));
 	// no checksum because apparently it's optional ¯\_(ツ)_/¯
 }
