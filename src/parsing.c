@@ -129,13 +129,13 @@ int parse_options(int key, char *arg, struct argp_state *state)
 			nmap.target_arg = arg;
 			break;
 		case ARGP_KEY_END:
-			if (!nmap.target_file && !nmap.target_opt && !nmap.target_arg)
+			if (state->argc == 1) {
+				argp_help(state->root_argp, state->out_stream, ARGP_HELP_STD_HELP, state->name);
+				exit(0);
+			}
+			else if (!nmap.target_file && !nmap.target_opt && !nmap.target_arg)
 				argp_error(state, "no target provided");
 			break;
-		case ARGP_KEY_NO_ARGS:
-			argp_help(state->root_argp, state->out_stream, ARGP_HELP_STD_HELP, state->name);
-			exit(0);
-		/* FALLTHROUGH */
 		default:
 			return ARGP_ERR_UNKNOWN;
 	}
