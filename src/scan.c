@@ -13,7 +13,6 @@ void	breakloop(union sigval arg)
 	struct timer_data *data;
 
 	data = (struct timer_data *) arg.sival_ptr;
-	// fprintf(stdout, "breakloop: %p, %p, %p, %p\n", arg.sival_ptr, (void *) data, (void *) data->handle, (void *) &data->handle_mutex);
 	pthread_mutex_lock(&data->handle_mutex);
 	if (data->handle)
 		pcap_breakloop(data->handle);
@@ -134,8 +133,6 @@ void	scan(pcap_t *handle, struct sockaddr_in src, struct sockaddr_in tgt,
 			return ;
 		}
 		ret = pcap_next_ex(handle, &pcap_hdr, &packet);
-		// if (ret == 0)
-		// 	fprintf(stdout, "0\n");
 		if (timer_gettime(timerid, &curr_timer))
 		{
 			perror("Couldn't get current timer");
