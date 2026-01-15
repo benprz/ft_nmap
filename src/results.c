@@ -60,16 +60,3 @@ void	add_result(in_addr_t target, unsigned short port, enum scan_type scan,
 	results[i].results[port - nmap.port_start] |= result << (scan * 3);
 	pthread_mutex_unlock(&result_mutex);
 }
-
-const char *scan_result_to_str(enum scan_result r)
-{
-    switch (r)
-    {
-        case SR_OPEN: return "open";
-        case SR_CLOSED: return "closed";
-        case SR_FILTERED: return "filtered";
-        case SR_UNFILTERED: return "unfiltered";
-        case SR_OPEN_FILTERED: return "open|filtered";
-        default: return "unknown";
-    }
-}
