@@ -29,7 +29,7 @@ OBJ = $(SRC:%.c=$(OBJ_DIR)%.o)
 all: $(EXE)
 
 $(EXE): $(OBJ)
-	$(CC) $(CFLAGS) $(OBJ) -o $(EXE) -lm -lpcap -lpthread
+	$(CC) $(CFLAGS) $(OBJ) -o $(EXE) -lpcap -lpthread
 	@echo "------------"
 
 $(OBJ_DIR)%.o: $(SRC_DIR)%.c $(addprefix $(INC_DIR),$(INC))
