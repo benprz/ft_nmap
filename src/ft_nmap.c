@@ -19,36 +19,6 @@
 
 #include "ft_nmap.h"
 
-// Query routing table for source address and port
-int get_src_addr_and_port(const char *dest_ip, struct sockaddr_in *src_addr) {
-    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0) {
-        perror("Socket error");
-        return -1;
-    }
-
-    struct sockaddr_in dest_addr = {0};
-    dest_addr.sin_family = AF_INET;
-    dest_addr.sin_addr.s_addr = inet_addr(dest_ip);
-    dest_addr.sin_port = htons(9999); // Arbitrary port for routing query
-
-    if (connect(sockfd, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) < 0) {
-        perror("Connect error");
-        close(sockfd);
-        return -1;
-    }
-
-    socklen_t src_addr_len = sizeof(struct sockaddr_in);
-    if (getsockname(sockfd, (struct sockaddr *)src_addr, &src_addr_len) < 0) {
-        perror("Getsockname error");
-        close(sockfd);
-        return -1;
-    }
-
-    close(sockfd);
-    return 0;
-}
-
 void *thread_routine(void* arg) {
 	UNUSED(arg);
 	pcap_t				*handle;
